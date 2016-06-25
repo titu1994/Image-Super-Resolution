@@ -1,7 +1,7 @@
 import numpy as np
 import time
 from scipy.misc import imsave
-from ImageSRModel import PSNRLoss
+from models import PSNRLoss
 
 from keras import backend as K
 from keras.layers import Input
