@@ -33,8 +33,14 @@ class LearningModel(object):
     def create_model(self, height=33, width=33, channels=3, load_weights=False) -> Model:
         pass
 
-    def fit(self, trainX, trainY, batch_size=128, nb_epochs=100) -> Model:
+    def fit(self, trainX, trainY, weight_fn, batch_size=128, nb_epochs=100) -> Model:
         if self.model == None: self.create_model()
+
+        self.model.fit(trainX, trainY, batch_size=batch_size, nb_epoch=nb_epochs,
+                callbacks=[callbacks.ModelCheckpoint(weight_fn, monitor='val_PSNRLoss', save_best_only=True,  mode='max')],
+                validation_split=2000. / 38400)
+
+        return self.model
 
     def evaluate(self):
         if self.model == None: self.create_model(load_weights=True)
@@ -54,12 +60,12 @@ class LearningModel(object):
         theano.config.dnn.conv.algo_fwd = 'small'
 
         # Read image
-        img = imread(img_path, mode='RGB')
-        height, width = img.shape[0], img.shape[1]
-        if verbose: print("Old Size : ", img.shape)
+        true_img = imread(img_path, mode='RGB')
+        height, width = true_img.shape[0], true_img.shape[1]
+        if verbose: print("Old Size : ", true_img.shape)
 
         # Pre Upscale
-        img = imresize(img, (height * scale_factor, width * scale_factor))
+        img = imresize(true_img, (height * scale_factor, width * scale_factor), interp="bicubic")
         height, width = img.shape[0], img.shape[1]
         if verbose: print("New Size : ", img.shape)
 
@@ -76,6 +82,9 @@ class LearningModel(object):
 
         # Evaluate agains bilinear upscaled image. Just to measure if a good result was obtained.
         print("Evaluating results.")
+        true_img = true_img.transpose((2, 0, 1)).astype('float64') / 255
+        true_img = np.expand_dims(true_img, axis=0)
+
         error = model.evaluate(result, img_conv)
         print("Mean Squared Error (Compared to bilinear upscaled version) : ", error[0])
         print("Peak Signal to Noise Ratio (Compared to bilinear upscaled version) : ", error[1])
@@ -123,14 +132,8 @@ class ImageSuperResolutionModel(LearningModel):
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, batch_size=128, nb_epochs=100) -> Model:
-        super(ImageSuperResolutionModel, self).fit(trainX, trainY, batch_size, nb_epochs)
-
-        self.model.fit(trainX, trainY, batch_size=batch_size, nb_epoch=nb_epochs,
-              callbacks=[callbacks.ModelCheckpoint("SR Weights.h5", monitor='val_PSNRLoss', save_best_only=True, mode='max')],
-              validation_split=2000./38400)
-
-        return self.model
+    def fit(self, trainX, trainY, weight_fn="SR Weights.h5", batch_size=128, nb_epochs=100) -> Model:
+        return super(ImageSuperResolutionModel, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs)
 
 class ExpantionSuperResolution(LearningModel):
 
@@ -166,11 +169,6 @@ class ExpantionSuperResolution(LearningModel):
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, batch_size=128, nb_epochs=100) -> Model:
-        super(ExpantionSuperResolution, self).fit(trainX, trainY, batch_size, nb_epochs)
+    def fit(self, trainX, trainY, weight_fn="Expantion SR Weights.h5", batch_size=128, nb_epochs=100) -> Model:
+        return super(ExpantionSuperResolution, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs)
 
-        self.model.fit(trainX, trainY, batch_size=batch_size, nb_epoch=nb_epochs,
-            callbacks=[callbacks.ModelCheckpoint("Expantion SR Weights.h5", monitor='val_PSNRLoss', save_best_only=True, mode='max')],
-            validation_split=2000. / 38400)
-
-        return self.model
