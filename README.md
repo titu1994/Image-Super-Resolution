@@ -22,7 +22,7 @@ It is to be noted that both of these models underperform compared to the results
 The model weights are already provided, therefore simply running :<br>
 `python main.py "imgpath"`, where imgpath is a full path to the image.
 
-The default model is SRCNN, which underperforms compared to the Expanded SRCNN. To switch models,
+The default model is SRCNN, which underperforms compared to the Expanded SRCNN. To switch models,<br>
 `python main.py "imgpath" --model="esr"`, default being `--model='sr'`.
 
 If the scaling factor needs to be altered then :<br>
