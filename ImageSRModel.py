@@ -14,7 +14,7 @@ batchSize = 128
 fsub = low_resolution_size = 33
 high_resolution_size = 400
 
-f1, f2, f3 = 9, 5, 5
+f1, f2, f3 = 9, 1, 5
 n1, n2 = 64, 32
 
 c = 3 # Number of channels in input image

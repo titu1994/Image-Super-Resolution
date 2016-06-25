@@ -81,3 +81,4 @@ def transform_images(directory):
 if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images
     transform_images(input_path)
+    #loadImages()
