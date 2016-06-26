@@ -1,7 +1,7 @@
 # Image Super Resolution using Convolutional Neural Networks
 
 Implementation of Image Super Resolution CNN in Keras from the paper 
-<i><a href="https://arxiv.org/pdf/1501.00092.pdf">Image Super-Resolution Using Deep Convolutional Networks</a></i>. <br> 
+<i><a href="https://arxiv.org/pdf/1501.00092v3.pdf">Image Super-Resolution Using Deep Convolutional Networks</a></i>. <br> 
 Also contains a model that outperforms the above mentioned model, termed Expanded Super Resolution, and another model termed Denoiseing Auto Encoder SRCNN which outperforms both of the above models.
 
 ## Model Architecture
