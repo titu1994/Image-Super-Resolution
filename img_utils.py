@@ -39,6 +39,28 @@ def loadImages():
         if i % 1000 == 0  : print('%f percent loaded.' % (i * 100/ nb_images))
     return (dataX, dataY)
 
+def loadDenoisingImages():
+    import os
+    # Hold the images
+    dataX = np.zeros((nb_images, 3, fsub-1, fsub-1))
+    dataY = np.zeros((nb_images, 3, fsub-1, fsub-1))
+
+    for i, file in enumerate(os.listdir(output_path_Y)):
+        # Training images are blurred versions ('Y' according to paper)
+        y = imread(output_path_Y + file, mode="RGB")
+        y = imresize(y, (fsub-1, fsub-1))
+        y = y.transpose((2, 0, 1)).astype('float64') / 255
+        dataX[i, :, :, :] = y
+
+        # Non blurred images ('X' according to paper)
+        x = imread(output_path_X + file, mode="RGB")
+        x = imresize(x, (fsub-1, fsub-1))
+        x = x.transpose((2, 0, 1)).astype('float64') / 255
+        dataY[i, :, :, :] = x
+
+        if i % 1000 == 0: print('%f percent loaded.' % (i * 100 / nb_images))
+    return (dataX, dataY)
+
 def transform_images(directory):
     import os
     import time
