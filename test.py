@@ -14,8 +14,8 @@ if __name__ == "__main__":
     #plot(model, to_file="SRCNN.png", show_shapes=True, show_layer_names=True)
     #model = models.ExpantionSuperResolution().create_model()
     #plot(model, to_file="ESRCNN.png", show_layer_names=True, show_shapes=True)
-    #denoise = models.DenoisingAutoEncoderSR()
-    #plot(model, to_file="Drnoise.png", show_layer_names=True, show_shapes=True)
+    model = models.DenoisingAutoEncoderSR().create_model()
+    plot(model, to_file="Denoise.png", show_layer_names=True, show_shapes=True)
 
     """
     Train ExpantionSuperResolution
