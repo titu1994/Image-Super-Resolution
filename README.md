@@ -25,7 +25,7 @@ The above is called "Expanded SRCNN", which performs slightly better than the de
 ### Denoiseing (Auto Encoder) Super Resolution CNN (DSRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/Denoise.png" height=100% width=40%>
 
-The above is the "Denoiseing Auto Encoder SR", which performs even better than Expanded SRCNN on Set5 (PSNR 34.88 dB vs 33.37 dB).
+The above is the "Denoiseing Auto Encoder SRCNN", which performs even better than Expanded SRCNN on Set5 (PSNR 34.88 dB vs 33.37 dB).
 
 ## Usage
 The model weights are already provided, therefore simply running :<br>
