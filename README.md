@@ -65,7 +65,7 @@ There are 14 extra images provided in results, 2 of which (Monarch Butterfly and
 ### Monarch Butterfly
 Bilinear
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_intermediate.jpg" width=25% height=25%> SRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_sr(2x).jpg" width=25% height=25%> ESRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_sr(2x).jpg" width=25% height=25%> <br>ESRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_esr(2x).jpg" width=25% height=25%> 
 DSRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_denoise(2x).jpg" height=25% width=25%>
@@ -74,7 +74,7 @@ DSRCNN
 Bilinear
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_intermediate.jpg" width=25% height=25%> SRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_sr(2x).jpg" width=25% height=25%>
-ESRCNN
+<br>ESRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_esr(2x).jpg" width=25% height=25%>
 DSRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_denoise(2x).jpg" width=25% height=25%>
