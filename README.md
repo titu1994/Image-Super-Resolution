@@ -22,7 +22,7 @@ It is to be noted that the original models underperform compared to the results 
 
 The above is called "Expanded SRCNN", which performs slightly better than the default SRCNN model on Set5 (PSNR 33.37 dB vs 32.4 dB).
 
-The "Expantion" occurs in the intermediate hidden layer, in which instead if just 1x1 kernels, we also use 3x3 and 5x5 kernels in order to maximize information learned from the layer. The outputs are then averaged, in order to provide more robust upscaled images.
+The "Expansion" occurs in the intermediate hidden layer, in which instead of just 1x1 kernels, we also use 3x3 and 5x5 kernels in order to maximize information learned from the layer. The outputs of this layer are then averaged, in order to construct more robust upscaled images.
 
 ### Denoiseing (Auto Encoder) Super Resolution CNN (DSRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/Denoise.png" height=100% width=40%>
