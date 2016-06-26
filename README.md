@@ -20,12 +20,18 @@ It is to be noted that the original models underperform compared to the results 
 ### Expanded Super Resolution CNN (ESRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/ESRCNN.png" height=100% width=75%>
 
-The above is called "Expanded SRCNN", which performs slightly better than the default SRCNN model on Set5 (PSNR 33.37 dB vs 32.4 dB) .
+The above is called "Expanded SRCNN", which performs slightly better than the default SRCNN model on Set5 (PSNR 33.37 dB vs 32.4 dB).
+
+The "Expantion" occurs in the intermediate hidden layer, in which instead if just 1x1 kernels, we also use 3x3 and 5x5 kernels in order to maximize information learned from the layer. The outputs are then averaged, in order to provide more robust upscaled images.
 
 ### Denoiseing (Auto Encoder) Super Resolution CNN (DSRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/Denoise.png" height=100% width=40%>
 
 The above is the "Denoiseing Auto Encoder SRCNN", which performs even better than Expanded SRCNN on Set5 (PSNR 34.88 dB vs 33.37 dB).
+
+This model uses bridge connections between the convolutional layers of the same level in order to speed up convergence and improve output results. The bridge connections are averaged to be more robust. 
+
+Since the training images are passed through a gausian filter (sigma = 0.5), then downscaled to 1/3rd the size, then upscaled to the original 33x33 size images, the images can be considered "noisy". Thus, this auto encoder quickly improves on the earlier results, and reduces the noisy output image problem faced by the simpler SRCNN model.
 
 ## Usage
 The model weights are already provided, therefore simply running :<br>
@@ -48,12 +54,12 @@ If you wish to train the network on your own data set, follow these steps (Perfo
 <br><b>[3]</b> Run img_utils.py function, `transform_images(input_path)`. By default, input_path is "input_images" path.
 <br><b>[4]</b> Open <b>tests.py</b> and un-comment the lines at model.fit(...), where model can be sr, esr or dsr. 
 <br><b>Note: It may be useful to save the original weights in some other location.</b>
-<br><b>[4]</b> Execute tests.py to begin training. GPU is recommended, although if small number of images are there then not required.
+<br><b>[4]</b> Execute tests.py to begin training. GPU is recommended, although if small number of images are provided then GPU may not be required.
 
 ## Caveats
 Very large images may not work with the GPU. Therefore, 
 <br>[1] If using Theano, set device="cpu" and cnmem=0.0 in theanorc.txt
-<br>[2] If using Tensorflor, set it to cpu mode
+<br>[2] If using Tensorflow, set it to cpu mode
 
 Denoiseing Auto Encoder requires MaxPooling and subsequent UpSampling of the input. Since there are 3 MaxPooling and 3 UpSampling layers, therefore the image size must be multiples of 8. 
 
