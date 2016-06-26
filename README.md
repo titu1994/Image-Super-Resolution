@@ -6,6 +6,8 @@ Implementation of Image Super Resolution CNN in Keras from the paper
 ## Model Architecture
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/SRCNN.png" height=100% width=25%>
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/ESRCNN.png" height=100% width=50%>
+<br>
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/Denoise.png" height=100% width=25%>
 
 The model on the left is the simplest model of the ones described in the paper above, consisting of the 9-1-5 model.
 Larger architecures can be easily made, but come at the cost of execution time, especially on CPU.
@@ -16,14 +18,16 @@ However there are some differences from the original paper:
 
 On the right is the "Expanded SRCNN", which performs slightly better on Set5 (PSNR 33.37 dB vs 32.4 dB) than the default SRCNN model.
 
-It is to be noted that both of these models underperform compared to the results posted in the paper. This maybe due to the only 91 images being the training set compared to the entire ILSVR 2013 image set. It still performs well, however images are slightly noisy. Noise reduction training may need to be performed.
+On the bottom is the "Denoising Auto Encoder SR", which performs even better than Expanded SRCNN on Set5 (PSNR 34.88 dB vs 33.37 dB).
+
+It is to be noted that the original models underperform compared to the results posted in the paper. This maybe due to the only 91 images being the training set compared to the entire ILSVR 2013 image set. It still performs well, however images are slightly noisy.
 
 ## Usage
 The model weights are already provided, therefore simply running :<br>
 `python main.py "imgpath"`, where imgpath is a full path to the image.
 
-The default model is SRCNN, which underperforms compared to the Expanded SRCNN. To switch models,<br>
-`python main.py "imgpath" --model="esr"`, default being `--model='sr'`.
+The default model is SRCNN, which underperforms compared to the Expanded SRCNN or Denoising SR. To switch models,<br>
+`python main.py "imgpath" --model="type"`, where type = sr, esr or dsr
 
 If the scaling factor needs to be altered then :<br>
 `python main.py "imgpath" --scale=s`, where s can be any number. Default s = 2
@@ -45,18 +49,26 @@ Very large images may not work with the GPU. Therefore,
 <br>[1] If using Theano, set device="cpu" and cnmem=0.0 in theanorc.txt
 <br>[2] If using Tensorflor, set it to cpu mode
 
+Denoising Auto Encoder requires MaxPooling and subsequent UpSampling of the input. Since there are 3 MaxPooling and 3 UpSampling layers, therefore the image size must be multiples of 8. 
+
+In case the image size is not a multiple of 8, the image will be auto scaled to the nearest approximation of required size and then Denoising Auto Encoder upsampling will be performed.
+
 ## Examples
-There are 14 extra images provided in results, 2 of which (Monarch Butterfly and Zebra) have been scaled using both bilinear and SRCNN.
+There are 14 extra images provided in results, 2 of which (Monarch Butterfly and Zebra) have been scaled using both bilinear, SRCNN, ESRCNN and DSRCNN.
 
 ### Monarch Butterfly
 Bilinear
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_intermediate.bmp" width=25% height=25%> SRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_scaled(2x).bmp" width=25% height=25%> E SRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/butterfly_esr_GT_scaled(2x).bmp" width=25% height=25%> 
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_intermediate.jpg" width=25% height=25%> SRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_sr(2x).jpg" width=25% height=25%> ESRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_esr(2x).jpg" width=25% height=25%> 
+DSRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_denoise(2x).jpg" height=25% width=25%>
 
 ### Zebra
 Bilinear
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_intermediate.bmp" width=25% height=25%> SRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_scaled(2x).bmp" width=25% height=25%>
-E SRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_esr_scaled(2x).bmp" width=25% height=25%>
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_intermediate.jpg" width=25% height=25%> SRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_sr(2x).jpg" width=25% height=25%>
+ESRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_esr(2x).jpg" width=25% height=25%>
+DSRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_denoise(2x).jpg" width=25% height=25%>
