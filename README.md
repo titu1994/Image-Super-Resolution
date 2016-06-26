@@ -9,13 +9,13 @@ Also contains a model that outperforms the above mentioned model, termed Expande
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/SRCNN.png" height=100% width=25%>
 
 The model above is the simplest model of the ones described in the paper above, consisting of the 9-1-5 model.
-Larger architecures can be easily made, but come at the cost of execution time, especially on CPU.
+Larger architectures can be easily made, but come at the cost of execution time, especially on CPU.
 
 However there are some differences from the original paper:
 <br><b>[1]</b> Used the AdaDelta optimizer instead of RMSProp.
 <br><b>[2]</b> This model contains some 21,000 parameters, more than the 8,400 of the original paper.
 
-It is to be noted that the original models underperform compared to the results posted in the paper. This maybe due to the only 91 images being the training set compared to the entire ILSVR 2013 image set. It still performs well, however images are slightly noisy.
+It is to be noted that the original models underperform compared to the results posted in the paper. This may be due to the only 91 images being the training set compared to the entire ILSVR 2013 image set. It still performs well, however images are slightly noisy.
 
 ### Expanded Super Resolution CNN (ESRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/ESRCNN.png" height=100% width=75%>
@@ -44,11 +44,11 @@ If the intermediate step (bilinear scaled image) is needed, then:<br>
 If you wish to train the network on your own data set, follow these steps (Performance may vary) :
 <br><b>[1]</b> Save all of your input images of any size in the <b>"input_images"</b> folder
 <br><b>[2]</b> Open img_utils.py and manually compute the <b>nb_images</b>, located at line 10. 
-<br>(nb_images = 400 * number of images in the "input_images" folder). This is needed to efficiently create the sub-images.
+<br>(<b>nb_images = 400 * number of images in the "input_images" folder</b>). This is needed to efficiently create the sub-images.
 <br><b>[3]</b> Run img_utils.py function, `transform_images(input_path)`. By default, input_path is "input_images" path.
 <br><b>[4]</b> Open <b>tests.py</b> and un-comment the lines at model.fit(...), where model can be sr, esr or dsr. 
-<br><b>Note: It may be usefull to save the original weights in some other location.</b>
-<br><b>[4]</b> Execute tests.py to begin training. GPU is recomended, althoug if small number of images are there then not required.
+<br><b>Note: It may be useful to save the original weights in some other location.</b>
+<br><b>[4]</b> Execute tests.py to begin training. GPU is recommended, although if small number of images are there then not required.
 
 ## Caveats
 Very large images may not work with the GPU. Therefore, 
