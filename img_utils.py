@@ -100,7 +100,51 @@ def transform_images(directory):
 
     print("Images finished.")
 
+def split_image(img, scaling_factor):
+    """
+    Solits image in (scale_factor x scale_factor) partitions, therefore allowing smaller images of size
+    (height / scale_factor, width_scale_factor) to be loaded into gpu for scaling
+
+    :param img: Image of shape (height, width, channels)
+    :return: Sharded image of shape (s*s, height, width, channels) where s is scale_factor
+    """
+    height, width = img.shape[0], img.shape[1]
+
+    shard_height = height // scaling_factor
+    shard_width = width // scaling_factor
+    nb_shards = scaling_factor * scaling_factor
+
+    shards = np.empty((nb_shards, shard_height, shard_width, 3))
+    shard_index = 0
+
+    for i in range(0, scaling_factor):
+        for j in range(0, scaling_factor):
+            shards[shard_index, :, :, :] = img[i*shard_height:(i+1)*shard_height,
+                                               j*shard_width: (j+1)*shard_width, :]
+            shard_index += 1
+
+    return shards
+
+def merge_images(imgs, scaling_factor):
+    """
+    Merges the shards of the image into a new image of shape (true_height, true_width, 3)
+
+    :return: Merged image of shape (true_height, true_width, 3)
+    """
+    height, width = imgs.shape[1], imgs.shape[2]
+    true_height, true_width = height * scaling_factor, width * scaling_factor
+
+    img = np.empty((true_height, true_width, 3))
+    img_index = 0
+
+    for i in range(0, scaling_factor):
+        for j in range(0, scaling_factor):
+            img[i*height:(i+1)*height, j*width: (j+1)*width, :] = imgs[img_index, :, :, :]
+            img_index += 1
+
+    return img
+
 if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images
-    transform_images(input_path)
-    #loadImages()
+    #transform_images(input_path)
+    pass
