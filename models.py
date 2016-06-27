@@ -93,24 +93,21 @@ class LearningModel(object):
         true_height, true_width = true_img.shape[0], true_img.shape[1]
         if verbose: print("Old Size : ", true_img.shape)
 
+        # Denoiseing SR needs image size to be divisible by 4 (2 MaxPooling ops).
+        # Also since we will be slicing the image, we need to compensate for that.
         if self.model_name == "Denoise AutoEncoder SR":
-            if (true_height // scale_factor % 8 != 0) or (true_width // scale_factor % 8 != 0):
-                print("Image shard size needs to be divisible by 8 to use denoise auto encoder.")
+            if (true_height // scale_factor % 4 != 0) or (true_width // scale_factor % 4 != 0):
+                print("Image shard size needs to be divisible by 4 to use denoise auto encoder.")
                 print("Resizing")
-                true_height = (true_height // scale_factor // 8) * 8 * scale_factor
-                true_width = (true_width //scale_factor // 8) * 8 * scale_factor
+                true_height = (true_height // scale_factor // 4) * 4 * scale_factor
+                true_width = (true_width //scale_factor // 4) * 4 * scale_factor
                 true_img = imresize(true_img, (true_height, true_width))
 
                 print("Image has been modified to size (%d, %d)" % (true_height, true_width))
 
         # Pre Upscale
         img = imresize(true_img, (true_height * scale_factor, true_width * scale_factor))
-        height, width = img.shape[0], img.shape[1]
         if verbose: print("New Size : ", img.shape)
-
-        # Support for large images
-        if (height >= 1500) or (width >= 1500):
-            if verbose: print("Image size is too large to scale at once. Splitting images...")
 
         # Split the image into multiple shards
         shards = img_utils.split_image(img, scale_factor)
@@ -136,13 +133,14 @@ class LearningModel(object):
             true_img = img_utils.split_image(true_img, scale_factor)
             true_height, true_width = true_img.shape[1], true_img.shape[2]
 
-            # Apply bilinear upscaling
+            # Apply bilinear upscaling to each shard
             for i in range(scale_factor * scale_factor):
                 temp = imresize(true_img[i, :, :, :], (true_height // scale_factor, true_width // scale_factor))
                 true_img[i, :, :, :] = imresize(temp, (true_height, true_width))
 
             true_img = true_img.transpose((0, 3, 1, 2)).astype('float64') / 255
 
+            # Create a model to evaluate the shards and true image
             eval_model = self.create_model(true_height, true_width, load_weights=True)
             eval_result = eval_model.predict(true_img)
             error = eval_model.evaluate(eval_result, true_img)
@@ -169,68 +167,6 @@ class LearningModel(object):
 
         imsave(filename, result)
 
-    def __upscale_shards(self, img_path, imgs, true_img, upscaled_img, scale_factor=2, save_intermediate=False, return_image=False,
-                         suffix="scaled", verbose=True, evaluate=True):
-        import os
-        import theano
-        from scipy.misc import imread, imresize, imsave
-
-        # Flag that may cause crash if algo_fwd = 'time_once'
-        theano.config.dnn.conv.algo_fwd = 'small'
-
-        # Compute new height
-        height, width = imgs.shape[1], imgs.shape[2]
-
-        # Transpose and Process images
-        img_conv = imgs.transpose((0, 3, 1, 2)).astype('float64') / 255
-
-        model = self.create_model(height, width, load_weights=True)
-        if verbose: print("Model loaded.")
-
-        # Create prediction for image
-        result = model.predict(img_conv)
-        if verbose: print("Model finished upscaling.")
-
-        if evaluate:
-            # Evaluate agains bilinear upscaled image. Just to measure if a good result was obtained.
-            if verbose: print("Evaluating results.")
-
-            # Shard true_img into peices
-            true_img = img_utils.split_image(true_img, scale_factor)
-            true_height, true_width = true_img.shape[1], true_img.shape[2]
-
-            # Apply bilinear upscaling
-            for i in range(scale_factor * scale_factor):
-                temp = imresize(true_img[i, :, :, :], (true_height // scale_factor, true_width // scale_factor))
-                true_img[i, :, :, :] = imresize(temp, (true_height, true_width))
-
-            true_img = true_img.transpose((0, 3, 1, 2)).astype('float64') / 255
-
-            eval_model = self.create_model(true_height, true_width, load_weights=True)
-            eval_result = eval_model.predict(true_img)
-            error = eval_model.evaluate(eval_result, true_img)
-            print("Mean Squared Error of %s : " % (self.model_name), error[0])
-            print("Peak Signal to Noise Ratio of %s : " % (self.model_name), error[1])
-
-        # Deprocess
-        result = result.transpose((0, 2, 3, 1)).astype('float64') * 255
-        result = img_utils.merge_images(result, scale_factor)
-        result = np.clip(result, 0, 255).astype('uint8')
-
-        if return_image:
-            # Return the image without saving. Usefull for testing images.
-            return result
-
-        path = os.path.splitext(img_path)
-        filename = path[0] + "_" + suffix + "(%dx)" % (scale_factor) + path[1]
-
-        if verbose: print("Saving image.")
-        # Save intermediate bilinear scaled image is needed for comparison.
-        if save_intermediate:
-            fn = path[0] + "_intermediate" + path[1]
-            imsave(fn, upscaled_img)
-
-        imsave(filename, result)
 
 class ImageSuperResolutionModel(LearningModel):
 

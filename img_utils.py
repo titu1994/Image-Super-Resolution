@@ -114,6 +114,7 @@ def split_image(img, scaling_factor):
     shard_width = width // scaling_factor
     nb_shards = scaling_factor * scaling_factor
 
+    # Holder for image shards
     shards = np.empty((nb_shards, shard_height, shard_width, 3))
     shard_index = 0
 
@@ -134,6 +135,7 @@ def merge_images(imgs, scaling_factor):
     height, width = imgs.shape[1], imgs.shape[2]
     true_height, true_width = height * scaling_factor, width * scaling_factor
 
+    # Holder for image
     img = np.empty((true_height, true_width, 3))
     img_index = 0
 
