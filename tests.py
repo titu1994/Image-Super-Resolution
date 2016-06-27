@@ -4,7 +4,7 @@ import models
 import img_utils
 
 if __name__ == "__main__":
-    path = r"D:\Yue\Desktop\Neural Art\Output\Japanese Path.jpg"
+    path = r""
 
     """
     Plot the models
@@ -49,14 +49,16 @@ if __name__ == "__main__":
     """
     Compare output images of sr, esr and denoise models
     """
-    sr = models.ImageSuperResolutionModel()
-    sr.upscale(path, scale_factor=2, save_intermediate=False, suffix="sr")
+    #scale = 2
+
+    #sr = models.ImageSuperResolutionModel()
+    #sr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="sr")
 
     #esr = models.ExpantionSuperResolution()
-    #esr.upscale(path, scale_factor=2, save_intermediate=False, suffix="esr")
+    #esr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="esr")
 
     #dsr = models.DenoisingAutoEncoderSR()
-    #dsr.upscale(path, scale_factor=2, save_intermediate=False, suffix="denoise")
+    #dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr")
 
 
 

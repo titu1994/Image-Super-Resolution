@@ -88,22 +88,22 @@ class LearningModel(object):
         theano.config.dnn.conv.algo_fwd = 'small'
 
         # Read image
+        scale_factor = int(scale_factor)
         true_img = imread(img_path, mode='RGB')
         true_height, true_width = true_img.shape[0], true_img.shape[1]
         if verbose: print("Old Size : ", true_img.shape)
 
         if self.model_name == "Denoise AutoEncoder SR":
-            if (true_height % 8 != 0) or (true_width % 8 != 0):
-                print("Image size needs to be divisible by 8 to use denoise auto encoder.")
+            if (true_height // scale_factor % 8 != 0) or (true_width // scale_factor % 8 != 0):
+                print("Image shard size needs to be divisible by 8 to use denoise auto encoder.")
                 print("Resizing")
-                true_height = (true_height // 8) * 8
-                true_width = (true_width // 8) * 8
+                true_height = (true_height // scale_factor // 8) * 8 * scale_factor
+                true_width = (true_width //scale_factor // 8) * 8 * scale_factor
                 true_img = imresize(true_img, (true_height, true_width))
 
                 print("Image has been modified to size (%d, %d)" % (true_height, true_width))
 
         # Pre Upscale
-        scale_factor = int(scale_factor)
         img = imresize(true_img, (true_height * scale_factor, true_width * scale_factor))
         height, width = img.shape[0], img.shape[1]
         if verbose: print("New Size : ", img.shape)
@@ -111,31 +111,37 @@ class LearningModel(object):
         # Support for large images
         if (height >= 1500) or (width >= 1500):
             if verbose: print("Image size is too large to scale at once. Splitting images...")
-            shards = img_utils.split_image(img, scale_factor)
 
-            self.__upscale_shards(img_path, shards, true_img, img, scale_factor, save_intermediate, return_image,
-                                  suffix, verbose, evaluate)
-            return
+        # Split the image into multiple shards
+        shards = img_utils.split_image(img, scale_factor)
 
-        # Transpose and Process image
-        img_conv = img.transpose((2, 0, 1)).astype('float64') / 255
-        img_conv = np.expand_dims(img_conv, axis=0)
+        # Compute new height
+        height, width = shards.shape[1], shards.shape[2]
+
+        # Transpose and Process images
+        img_conv = shards.transpose((0, 3, 1, 2)).astype('float64') / 255
 
         model = self.create_model(height, width, load_weights=True)
         if verbose: print("Model loaded.")
 
         # Create prediction for image
-        result = model.predict(img_conv)
+        result = model.predict(img_conv, verbose=verbose)
         if verbose: print("Model finished upscaling.")
 
         if evaluate:
             # Evaluate agains bilinear upscaled image. Just to measure if a good result was obtained.
             if verbose: print("Evaluating results.")
-            # Pre Downscale if evaluate = True
-            true_img = imresize(true_img, (true_height // scale_factor, true_width // scale_factor))
-            true_img = imresize(true_img, (true_height, true_width))
-            true_img = true_img.transpose((2, 0, 1)).astype('float64') / 255
-            true_img = np.expand_dims(true_img, axis=0)
+
+            # Shard true_img into peices
+            true_img = img_utils.split_image(true_img, scale_factor)
+            true_height, true_width = true_img.shape[1], true_img.shape[2]
+
+            # Apply bilinear upscaling
+            for i in range(scale_factor * scale_factor):
+                temp = imresize(true_img[i, :, :, :], (true_height // scale_factor, true_width // scale_factor))
+                true_img[i, :, :, :] = imresize(temp, (true_height, true_width))
+
+            true_img = true_img.transpose((0, 3, 1, 2)).astype('float64') / 255
 
             eval_model = self.create_model(true_height, true_width, load_weights=True)
             eval_result = eval_model.predict(true_img)
@@ -144,8 +150,8 @@ class LearningModel(object):
             print("Peak Signal to Noise Ratio of %s : " % (self.model_name), error[1])
 
         # Deprocess
-        result = result.reshape((3, height, width))
-        result = result.transpose((1, 2, 0)).astype('float64') * 255
+        result = result.transpose((0, 2, 3, 1)).astype('float64') * 255
+        result = img_utils.merge_images(result, scale_factor)
         result = np.clip(result, 0, 255).astype('uint8')
 
         if return_image:
