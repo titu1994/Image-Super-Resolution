@@ -102,7 +102,7 @@ def transform_images(directory):
 
 def split_image(img, scaling_factor):
     """
-    Solits image in (scale_factor x scale_factor) partitions, therefore allowing smaller images of size
+    Splits image in (scale_factor x scale_factor) partitions, therefore allowing smaller images of size
     (height / scale_factor, width_scale_factor) to be loaded into gpu for scaling
 
     :param img: Image of shape (height, width, channels)

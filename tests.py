@@ -4,7 +4,7 @@ import models
 import img_utils
 
 if __name__ == "__main__":
-    path = r""
+    path = r"D:\Yue\Desktop\Neural Art\Output\River Large.png"
 
     """
     Plot the models
@@ -49,16 +49,16 @@ if __name__ == "__main__":
     """
     Compare output images of sr, esr and denoise models
     """
-    #scale = 2
+    scale = 2
 
-    #sr = models.ImageSuperResolutionModel()
-    #sr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="sr")
+    sr = models.ImageSuperResolutionModel()
+    sr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="sr")
 
-    #esr = models.ExpantionSuperResolution()
-    #esr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="esr")
+    esr = models.ExpantionSuperResolution()
+    esr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="esr")
 
-    #dsr = models.DenoisingAutoEncoderSR()
-    #dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr")
+    dsr = models.DenoisingAutoEncoderSR()
+    dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr")
 
 
 
