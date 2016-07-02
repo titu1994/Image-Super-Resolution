@@ -89,7 +89,7 @@ Bilinear
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_sr(2x).jpg" width=25% height=25%> <br>ESRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_esr(2x).jpg" width=25% height=25%> 
 DDSRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_ddsr(2x).png(2x).jpg" height=25% width=25%>
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_ddsr(2x).png" height=25% width=25%>
 
 ### Zebra
 Bilinear
@@ -98,4 +98,4 @@ Bilinear
 <br>ESRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_esr(2x).jpg" width=25% height=25%>
 DDSRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_ddsr(2x).jpg" width=25% height=25%>
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_ddsr(2x).png" width=25% height=25%>
