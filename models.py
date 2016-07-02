@@ -217,12 +217,12 @@ class ImageSuperResolutionModel(LearningModel):
 
         model = Model(init, out)
         model.compile(optimizer='adadelta', loss='mse', metrics=[PSNRLoss])
-        if load_weights: model.load_weights("SR Weights.h5")
+        if load_weights: model.load_weights("weights/SR Weights.h5")
 
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, weight_fn="SR Weights.h5", batch_size=128, nb_epochs=100,
+    def fit(self, trainX, trainY, weight_fn="weights/SR Weights.h5", batch_size=128, nb_epochs=100,
                                 save_history=True, history_fn="SRCNN History.txt") -> Model:
         return super(ImageSuperResolutionModel, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
@@ -256,12 +256,12 @@ class ExpantionSuperResolution(LearningModel):
 
         model = Model(init, out)
         model.compile(optimizer='adadelta', loss='mse', metrics=[PSNRLoss])
-        if load_weights: model.load_weights("Expantion SR Weights.h5")
+        if load_weights: model.load_weights("weights/Expantion SR Weights.h5")
 
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, weight_fn="Expantion SR Weights.h5", batch_size=128, nb_epochs=100,
+    def fit(self, trainX, trainY, weight_fn="weights/Expantion SR Weights.h5", batch_size=128, nb_epochs=100,
                                         save_history=True, history_fn="ESRCNN History.txt") -> Model:
         return super(ExpantionSuperResolution, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
@@ -298,12 +298,12 @@ class DenoisingAutoEncoderSR(LearningModel):
 
         model = Model(init, decoded)
         model.compile(optimizer='adadelta', loss='mse', metrics=[PSNRLoss])
-        if load_weights: model.load_weights("Denoising AutoEncoder.h5")
+        if load_weights: model.load_weights("weights/Denoising AutoEncoder.h5")
 
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, weight_fn="Denoising AutoEncoder.h5", batch_size=128, nb_epochs=100,
+    def fit(self, trainX, trainY, weight_fn="weights/Denoising AutoEncoder.h5", batch_size=128, nb_epochs=100,
                             save_history=True, history_fn="DSRCNN History.txt"):
         return super(DenoisingAutoEncoderSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
@@ -357,12 +357,12 @@ class DeepDenoiseSR(LearningModel):
 
         model = Model(init, decoded)
         model.compile(optimizer='adam', loss='mse', metrics=[PSNRLoss])
-        if load_weights: model.load_weights("Deep Denoise Weights.h5")
+        if load_weights: model.load_weights("weights/Deep Denoise Weights.h5")
 
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, weight_fn="Deep Denoise Weights.h5", batch_size=128, nb_epochs=100,
+    def fit(self, trainX, trainY, weight_fn="weights/Deep Denoise Weights.h5", batch_size=128, nb_epochs=100,
                          save_history=True, history_fn="Deep DSRCNN History.txt"):
         super(DeepDenoiseSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 

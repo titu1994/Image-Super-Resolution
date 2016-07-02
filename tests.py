@@ -11,13 +11,13 @@ if __name__ == "__main__":
     """
 
     #model = models.ImageSuperResolutionModel().create_model()
-    #plot(model, to_file="SRCNN.png", show_shapes=True, show_layer_names=True)
+    #plot(model, to_file="architectures/SRCNN.png", show_shapes=True, show_layer_names=True)
     #model = models.ExpantionSuperResolution().create_model()
-    #plot(model, to_file="ESRCNN.png", show_layer_names=True, show_shapes=True)
+    #plot(model, to_file="architectures/ESRCNN.png", show_layer_names=True, show_shapes=True)
     #model = models.DenoisingAutoEncoderSR().create_model()
-    #plot(model, to_file="Denoise.png", show_layer_names=True, show_shapes=True)
+    #plot(model, to_file="architectures/Denoise.png", show_layer_names=True, show_shapes=True)
     #model = models.DeepDenoiseSR().create_model()
-    #plot(model, to_file="Deep Denoise.png", show_layer_names=True, show_shapes=True)
+    #plot(model, to_file="architectures/Deep Denoise.png", show_layer_names=True, show_shapes=True)
 
     """
     Train Super Resolution

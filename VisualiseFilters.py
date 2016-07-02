@@ -2,6 +2,8 @@ import numpy as np
 import time
 from scipy.misc import imsave
 from models import PSNRLoss
+import models
+
 
 from keras import backend as K
 from keras.layers import Input
@@ -46,14 +48,7 @@ c = 3 # Number of channels in input image
 
 init = Input(shape=(c, img_size, img_size))
 
-x = Convolution2D(n1, f1, f1, activation='relu', border_mode='same', name='conv1')(init)
-x = Convolution2D(n2, f2, f2, activation='relu', border_mode='same', name='conv2')(x)
-
-out = Convolution2D(c, f3, f3, border_mode='same', name='conv_final')(x)
-
-model = Model(init, out)
-model.compile(optimizer='adadelta', loss='mse', metrics=[PSNRLoss])
-model.load_weights("SR Weights.h5")
+model = models.ImageSuperResolutionModel().create_model(load_weights=True)
 
 firstLayer = model.layers[0]
 input_img = firstLayer.input
