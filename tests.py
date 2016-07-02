@@ -4,7 +4,7 @@ import models
 import img_utils
 
 if __name__ == "__main__":
-    path = r"D:\Yue\Desktop\Neural Art\Output\River Large.png"
+    path = r""
 
     """
     Plot the models
@@ -16,6 +16,8 @@ if __name__ == "__main__":
     #plot(model, to_file="ESRCNN.png", show_layer_names=True, show_shapes=True)
     #model = models.DenoisingAutoEncoderSR().create_model()
     #plot(model, to_file="Denoise.png", show_layer_names=True, show_shapes=True)
+    #model = models.DeepDenoiseSR().create_model()
+    #plot(model, to_file="Deep Denoise.png", show_layer_names=True, show_shapes=True)
 
     """
     Train Super Resolution
@@ -36,7 +38,7 @@ if __name__ == "__main__":
     #esr.fit(trainX, trainY, nb_epochs=100)
 
     """
-    Train DrnoisingAutoEncoderSR
+    Train DenoisingAutoEncoderSR
     """
     # NOTE: Denoising auto encoder requires even integer height x width. Thus the training images are downscaled.
     #trainX, trainY = img_utils.loadDenoisingImages()
@@ -47,18 +49,31 @@ if __name__ == "__main__":
     #dsr.fit(trainX, trainY)
 
     """
-    Compare output images of sr, esr and denoise models
+    Train Deep Denoise SR
     """
-    scale = 2
+    #trainX, trainY = img_utils.loadDenoisingImages()
 
-    sr = models.ImageSuperResolutionModel()
-    sr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="sr")
+    #ddsr = models.DeepDenoiseSR()
+    #ddsr.create_model(load_weights=False).summary()
 
-    esr = models.ExpantionSuperResolution()
-    esr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="esr")
+    #ddsr.fit(trainX, trainY, nb_epochs=60)
 
-    dsr = models.DenoisingAutoEncoderSR()
-    dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr")
+    """
+    Compare output images of sr, esr, dsr and ddsr models
+    """
+    #scale = 2
+
+    #sr = models.ImageSuperResolutionModel()
+    #sr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="sr")
+
+    #esr = models.ExpantionSuperResolution()
+    #esr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="esr")
+
+    #dsr = models.DenoisingAutoEncoderSR()
+    #dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr")
+
+    #ddsr = models.DeepDenoiseSR()
+    #ddsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="ddsr")
 
 
 

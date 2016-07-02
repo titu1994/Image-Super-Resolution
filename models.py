@@ -1,6 +1,7 @@
 from keras.models import Model
 from keras.layers import Input, merge
 from keras.layers.convolutional import Convolution2D
+from advanced import HistoryCheckpoint
 import keras.callbacks as callbacks
 import numpy as np
 import keras.backend as K
@@ -8,8 +9,6 @@ import img_utils
 
 path_X = r"output_images_X\\"
 path_Y = r"output_images_Y\\"
-
-import os
 
 def PSNRLoss(y_true, y_pred):
     """
@@ -42,16 +41,19 @@ class LearningModel(object):
         """
         pass
 
-    def fit(self, trainX, trainY, weight_fn, batch_size=128, nb_epochs=100) -> Model:
+    def fit(self, trainX, trainY, weight_fn, batch_size=128, nb_epochs=100,
+                                save_history=True, history_fn="Model History.txt") -> Model:
         """
         Standard method to train any of the models.
         The last 2000 images belong to the Set5 Validation images.
         """
         if self.model == None: self.create_model()
 
+        callback = [callbacks.ModelCheckpoint(weight_fn, monitor='val_PSNRLoss', save_best_only=True,  mode='max'),]
+        if save_history: callback.append(HistoryCheckpoint(history_fn))
+
         self.model.fit(trainX, trainY, batch_size=batch_size, nb_epoch=nb_epochs,
-                callbacks=[callbacks.ModelCheckpoint(weight_fn, monitor='val_PSNRLoss', save_best_only=True,  mode='max')],
-                validation_split=2000. / 38400)
+                callbacks=callback, validation_split=2000. / 38400)
 
         return self.model
 
@@ -67,8 +69,8 @@ class LearningModel(object):
             trainX, trainY = img_utils.loadDenoisingImages()
 
         error = self.model.evaluate(trainX[-2000:], trainY[-2000:])
-        print("Mean Squared Error (Compared to bilinear upscaled version) : ", error[0])
-        print("Peak Signal to Noise Ratio (Compared to bilinear upscaled version) : ", error[1])
+        print("Mean Squared Error : ", error[0])
+        print("Peak Signal to Noise Ratio : ", error[1])
 
     def upscale(self, img_path, scale_factor=2, save_intermediate=False, return_image=False, suffix="scaled", verbose=True,
             evaluate=True):
@@ -84,11 +86,7 @@ class LearningModel(object):
         :param evaluate: evaluate the upscaled image on the original image.
         """
         import os
-        import theano
         from scipy.misc import imread, imresize, imsave
-
-        # Flag that may cause crash if algo_fwd = 'time_once'
-        theano.config.dnn.conv.algo_fwd = 'small'
 
         # Destination path
         path = os.path.splitext(img_path)
@@ -103,12 +101,17 @@ class LearningModel(object):
 
         # Denoiseing SR needs image size to be divisible by 4 (2 MaxPooling ops, 2 UpSampling ops).
         # Also since we will be slicing the image, we need to compensate for that.
-        if self.model_name == "Denoise AutoEncoder SR":
+
+        denoise_models = ["Denoise AutoEncoder SR", "Deep Denoise SR"]
+
+        if self.model_name in denoise_models:
             if (init_height // scale_factor % 4 != 0) or (init_width // scale_factor % 4 != 0):
                 print("Image shard size needs to be divisible by 4 to use denoise auto encoder.")
                 print("Resizing")
-                true_height = (init_height // scale_factor // 4) * 4 * scale_factor
-                true_width = (init_width // scale_factor // 4) * 4 * scale_factor
+                h_pad = init_height // scale_factor % 4 + 1
+                w_pad = init_width // scale_factor % 4 + 1
+                true_height =  init_height + h_pad #(init_height // scale_factor // 4) * 4 * scale_factor
+                true_width = init_width + w_pad #(init_width // scale_factor // 4) * 4 * scale_factor
                 true_img = imresize(true_img, (true_height, true_width))
 
                 print("Image has been modified to size (%d, %d)" % (true_height, true_width))
@@ -219,8 +222,9 @@ class ImageSuperResolutionModel(LearningModel):
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, weight_fn="SR Weights.h5", batch_size=128, nb_epochs=100) -> Model:
-        return super(ImageSuperResolutionModel, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs)
+    def fit(self, trainX, trainY, weight_fn="SR Weights.h5", batch_size=128, nb_epochs=100,
+                                save_history=True, history_fn="SRCNN History.txt") -> Model:
+        return super(ImageSuperResolutionModel, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
 class ExpantionSuperResolution(LearningModel):
 
@@ -257,8 +261,9 @@ class ExpantionSuperResolution(LearningModel):
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, weight_fn="Expantion SR Weights.h5", batch_size=128, nb_epochs=100) -> Model:
-        return super(ExpantionSuperResolution, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs)
+    def fit(self, trainX, trainY, weight_fn="Expantion SR Weights.h5", batch_size=128, nb_epochs=100,
+                                        save_history=True, history_fn="ESRCNN History.txt") -> Model:
+        return super(ExpantionSuperResolution, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
 class DenoisingAutoEncoderSR(LearningModel):
 
@@ -298,11 +303,69 @@ class DenoisingAutoEncoderSR(LearningModel):
         self.model = model
         return model
 
-    def fit(self, trainX, trainY, weight_fn="Denoising AutoEncoder.h5", batch_size=128, nb_epochs=100):
-        return super(DenoisingAutoEncoderSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs)
+    def fit(self, trainX, trainY, weight_fn="Denoising AutoEncoder.h5", batch_size=128, nb_epochs=100,
+                            save_history=True, history_fn="DSRCNN History.txt"):
+        return super(DenoisingAutoEncoderSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
     def evaluate(self, is_denoise=False):
         """
         Evaluates the model on the Set5 Validation images
         """
         super(DenoisingAutoEncoderSR, self).evaluate(is_denoise=True)
+
+class DeepDenoiseSR(LearningModel):
+
+    def __init__(self):
+        super(DeepDenoiseSR, self).__init__("Deep Denoise SR")
+
+        self.n1 = 64
+        self.n2 = 128
+        self.n3 = 256
+
+    def create_model(self, height=32, width=32, channels=3, load_weights=False):
+        """
+        Creates a model to remove / reduce noise from upscaled images.
+        Based on the U-Net Architecture.
+        """
+        from keras.layers.convolutional import MaxPooling2D, UpSampling2D
+        from keras.layers import merge
+
+        init = Input(shape=(channels, height, width))
+
+        level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
+        level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_1)
+        x = MaxPooling2D((2, 2))(level1_1)
+
+        level2_1 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(x)
+        level2_1 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(level2_1)
+        x = MaxPooling2D((2, 2))(level2_1)
+
+        level3 = Convolution2D(self.n3, 3, 3, activation='relu', border_mode='same')(x)
+        x = UpSampling2D((2, 2))(level3)
+
+        level2_2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(x)
+        level2_2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(level2_2)
+        level2 = merge([level2_1, level2_2], mode='sum')
+
+        x = UpSampling2D((2, 2))(level2)
+
+        level1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(x)
+        level1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_2)
+        level1 = merge([level1_1, level1_2], mode='sum')
+
+        decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(level1)
+
+        model = Model(init, decoded)
+        model.compile(optimizer='adam', loss='mse', metrics=[PSNRLoss])
+        if load_weights: model.load_weights("Deep Denoise Weights.h5")
+
+        self.model = model
+        return model
+
+    def fit(self, trainX, trainY, weight_fn="Deep Denoise Weights.h5", batch_size=128, nb_epochs=100,
+                         save_history=True, history_fn="Deep DSRCNN History.txt"):
+        super(DeepDenoiseSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
+
+    def evaluate(self, is_denoise=True):
+        super(DeepDenoiseSR, self).evaluate(is_denoise)
+
