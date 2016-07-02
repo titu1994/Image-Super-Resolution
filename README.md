@@ -61,9 +61,11 @@ Very large images may not work with the GPU. Therefore,
 <br>[1] If using Theano, set device="cpu" and cnmem=0.0 in theanorc.txt
 <br>[2] If using Tensorflow, set it to cpu mode
 
-Denoiseing Auto Encoder requires MaxPooling and subsequent UpSampling of the input. Since there are 3 MaxPooling and 3 UpSampling layers, therefore the image size must be multiples of 8. 
+On the CPU, extremely high resolution images of the size upto 6000 x 6000 pixels can be handled if 16 GB RAM is provided. It may be better to use high scaling factor for such large image (such as s = 4 or even 8), since images will be split into multiple subimages and processed one by one. Obviously this will produce extremely large images (24000 x 24000 or 48000 x 48000) which may not fit in memory thus an optimal setting must be found manually.
 
-In case the image size is not a multiple of 8, the image will be auto scaled to the nearest approximation of required size and then Denoiseing Auto Encoder upsampling will be performed.
+Denoiseing Auto Encoder requires MaxPooling and subsequent UpSampling of the input. Since there are 2 MaxPooling and 2 UpSampling layers, therefore the image size must be multiples of 4. 
+
+In case the image size is not a multiple of 4, the image will be auto scaled to the nearest approximation of required size and then Denoiseing Auto Encoder upsampling will be performed.
 
 ## Examples
 There are 14 extra images provided in results, 2 of which (Monarch Butterfly and Zebra) have been scaled using both bilinear, SRCNN, ESRCNN and DSRCNN.
