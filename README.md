@@ -6,7 +6,7 @@ Also contains a model that outperforms the above mentioned model, termed Expande
 
 ## Model Architecture
 ### Super Resolution CNN (SRCNN)
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/SRCNN.png" height=100% width=25%>
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/SRCNN.png" height=100% width=25%>
 
 The model above is the simplest model of the ones described in the paper above, consisting of the 9-1-5 model.
 Larger architectures can be easily made, but come at the cost of execution time, especially on CPU.
@@ -18,14 +18,14 @@ However there are some differences from the original paper:
 It is to be noted that the original models underperform compared to the results posted in the paper. This may be due to the only 91 images being the training set compared to the entire ILSVR 2013 image set. It still performs well, however images are slightly noisy.
 
 ### Expanded Super Resolution CNN (ESRCNN)
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/ESRCNN.png" height=100% width=75%>
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/ESRCNN.png" height=100% width=75%>
 
 The above is called "Expanded SRCNN", which performs slightly better than the default SRCNN model on Set5 (PSNR 33.37 dB vs 32.4 dB).
 
 The "Expansion" occurs in the intermediate hidden layer, in which instead of just 1x1 kernels, we also use 3x3 and 5x5 kernels in order to maximize information learned from the layer. The outputs of this layer are then averaged, in order to construct more robust upscaled images.
 
 ### Denoiseing (Auto Encoder) Super Resolution CNN (DSRCNN)
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/Denoise.png" height=100% width=40%>
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/Denoise.png" height=100% width=40%>
 
 The above is the "Denoiseing Auto Encoder SRCNN", which performs even better than Expanded SRCNN on Set5 (PSNR 34.88 dB vs 33.37 dB).
 
@@ -33,12 +33,25 @@ This model uses bridge connections between the convolutional layers of the same 
 
 Since the training images are passed through a gausian filter (sigma = 0.5), then downscaled to 1/3rd the size, then upscaled to the original 33x33 size images, the images can be considered "noisy". Thus, this auto encoder quickly improves on the earlier results, and reduces the noisy output image problem faced by the simpler SRCNN model.
 
+### Deep Denoiseing Super Resolution (DDSRCNN)
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/Deep Denoise.png" height=100% width=40%>
+
+The above is the "Deep Denoiseing SRCNN", which is a modified form of the U-Net applied to image super-resolution. It performs far better than even the Denoiseing SRCNN, obtaining a high PSNR score on Set5 (PSNR 37.33 dB vs 34.88 dB).
+
+Following the same principle as DSRCNN, it uses skip connections at same levels, but increases the depth of the network by cascading 2 CNNs at each level. This drastically increases the speed of learning, acheiving near 36.1~ dB validation PSNR value in the first 5 epochs on the 91 image dataset of the original SRCNN.
+
+Similar to the paper <a href="http://arxiv.org/abs/1606.08921">Image Restoration Using Convolutional Auto-encoders with Symmetric Skip Connections</a>, this can be considered a highly simplified and shallow model compared to the 30 layer architecture used in the above paper. However even with just 8 layers, DDSRCNN acheives very high PSNR score, close to the scores in the paper (37.56 dB for 30-layer architecture vs 37.33 dB for 8 layer DDSRCNN architecture) on Set5 validation images.
+
+Considering the depth, and the vast number of parameters in the 30 layer architecture in the paper, we can see that a much shallower model is faster to train and still provides reasonably adequate results.
+
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/DDSRCNN%20validation%20plot.png" width=100% height=100%>
+
 ## Usage
-The model weights are already provided, therefore simply running :<br>
+The model weights are already provided in the weights folder, therefore simply running :<br>
 `python main.py "imgpath"`, where imgpath is a full path to the image.
 
-The default model is DSRCNN, which outperforms the other two models. To switch models,<br>
-`python main.py "imgpath" --model="type"`, where type = `sr`, `esr` or `dsr`
+The default model is DDSRCNN, which outperforms the other three models. To switch models,<br>
+`python main.py "imgpath" --model="type"`, where type = `sr`, `esr`, `dsr` or `ddsr`
 
 If the scaling factor needs to be altered then :<br>
 `python main.py "imgpath" --scale=s`, where s can be any number. Default `s = 2`
@@ -63,9 +76,9 @@ Very large images may not work with the GPU. Therefore,
 
 On the CPU, extremely high resolution images of the size upto 6000 x 6000 pixels can be handled if 16 GB RAM is provided. It may be better to use high scaling factor for such large image (such as s = 4 or even 8), since images will be split into multiple subimages and processed one by one. Obviously this will produce extremely large images (24000 x 24000 or 48000 x 48000) which may not fit in memory thus an optimal setting must be found manually.
 
-Denoiseing Auto Encoder requires MaxPooling and subsequent UpSampling of the input. Since there are 2 MaxPooling and 2 UpSampling layers, therefore the image size must be multiples of 4. 
+Due to image splitting, processing and then merging, there are some visible mergeing artifacts remaining. I am attempting to find a method to merge the images without these sharp boundaries for each shard of the image.
 
-In case the image size is not a multiple of 4, the image will be auto scaled to the nearest approximation of required size and then Denoiseing Auto Encoder upsampling will be performed.
+Denoiseing Auto Encoder requires MaxPooling and subsequent UpSampling of the input. Since there are 2 MaxPooling and 2 UpSampling layers, therefore the image size must be multiples of 4. In case the image size is not a multiple of 4, the image will be auto scaled to the nearest approximation of required size and then Denoiseing Auto Encoder upsampling will be performed.
 
 ## Examples
 There are 14 extra images provided in results, 2 of which (Monarch Butterfly and Zebra) have been scaled using both bilinear, SRCNN, ESRCNN and DSRCNN.
@@ -75,8 +88,8 @@ Bilinear
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_intermediate.jpg" width=25% height=25%> SRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_sr(2x).jpg" width=25% height=25%> <br>ESRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_esr(2x).jpg" width=25% height=25%> 
-DSRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_denoise(2x).jpg" height=25% width=25%>
+DDSRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_ddsr(2x).png(2x).jpg" height=25% width=25%>
 
 ### Zebra
 Bilinear
@@ -84,5 +97,5 @@ Bilinear
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_sr(2x).jpg" width=25% height=25%>
 <br>ESRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_esr(2x).jpg" width=25% height=25%>
-DSRCNN
-<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_denoise(2x).jpg" width=25% height=25%>
+DDSRCNN
+<img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_ddsr(2x).jpg" width=25% height=25%>
