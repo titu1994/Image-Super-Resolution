@@ -108,10 +108,8 @@ class LearningModel(object):
             if (init_height // scale_factor % 4 != 0) or (init_width // scale_factor % 4 != 0):
                 print("Image shard size needs to be divisible by 4 to use denoise auto encoder.")
                 print("Resizing")
-                h_pad = init_height // scale_factor % 4 + 1
-                w_pad = init_width // scale_factor % 4 + 1
-                true_height =  init_height + h_pad #(init_height // scale_factor // 4) * 4 * scale_factor
-                true_width = init_width + w_pad #(init_width // scale_factor // 4) * 4 * scale_factor
+                true_height = (init_height // scale_factor // 4) * 4 * scale_factor
+                true_width = (init_width // scale_factor // 4) * 4 * scale_factor
                 true_img = imresize(true_img, (true_height, true_width))
 
                 print("Image has been modified to size (%d, %d)" % (true_height, true_width))
@@ -144,7 +142,7 @@ class LearningModel(object):
 
             # Create a holder for the sub shards
             if holder is None:
-                holder = np.empty((scale_factor * scale_factor, height * scale_factor, width * scale_factor, 3))
+                holder = np.empty((nb_shards, height * scale_factor, width * scale_factor, 3))
 
             # Transpose and Process images
             img_conv = shards.transpose((0, 3, 1, 2)).astype('float64') / 255
