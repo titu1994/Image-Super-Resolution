@@ -70,10 +70,14 @@ if __name__ == "__main__":
     #esr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="esr")
 
     #dsr = models.DenoisingAutoEncoderSR()
-    #dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr")
+    #dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr", patch_size=4)
+    # patch_size=32 is needed since Deconv is currently Conv + MaxPool | UpSample + Conv.
+    # This will be unnecessary when proper Deconv is implemented where MaxPool and UpSample wont be needed.
 
     #ddsr = models.DeepDenoiseSR()
-    #ddsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="ddsr")
+    #ddsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="ddsr", patch_size=4)
+    # patch_size=32 is needed since Deconv is currently Conv + MaxPool | UpSample + Conv.
+    # This will be unnecessary when proper Deconv is implemented where MaxPool and UpSample wont be needed.
 
 
 

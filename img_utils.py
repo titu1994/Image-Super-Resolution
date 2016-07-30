@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.feature_extraction import image
 from scipy.misc import imsave, imread, imresize
+from sklearn.feature_extraction.image import reconstruct_from_patches_2d, extract_patches_2d
 from scipy.ndimage.filters import gaussian_filter
 import os
 
@@ -145,6 +146,24 @@ def merge_images(imgs, scaling_factor):
             img_index += 1
 
     return img
+
+def make_patch_grid(x, scale, patch_size, patch_stride=1, verbose=1):
+    '''x shape: (num_channels, rows, cols)'''
+    #x = x.transpose(2, 1, 0)
+    height, width = x.shape[0:2]
+    x = imresize(x, (height * scale, width * scale))
+    patches = extract_patches_2d(x, (patch_size, patch_size))
+    return patches
+
+
+def combine_patches_grid(in_patches, out_shape, scale):
+    '''Reconstruct an image from these `patches`
+
+    input shape: (rows, cols, channels, patch_row, patch_col)
+    '''
+    recon = reconstruct_from_patches_2d(in_patches, out_shape)
+    return recon
+
 
 if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images

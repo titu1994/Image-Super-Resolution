@@ -72,8 +72,8 @@ class LearningModel(object):
         print("Mean Squared Error : ", error[0])
         print("Peak Signal to Noise Ratio : ", error[1])
 
-    def upscale(self, img_path, scale_factor=2, save_intermediate=False, return_image=False, suffix="scaled", verbose=True,
-            evaluate=True):
+    def upscale(self, img_path, scale_factor=2, save_intermediate=False, return_image=False, suffix="scaled",
+                patch_size=3, patch_stride=1, verbose=True, evaluate=True):
         """
         Standard method to upscale an image.
 
@@ -108,89 +108,62 @@ class LearningModel(object):
             if (init_height // scale_factor % 4 != 0) or (init_width // scale_factor % 4 != 0):
                 print("Image shard size needs to be divisible by 4 to use denoise auto encoder.")
                 print("Resizing")
-                true_height = (init_height // scale_factor // 4) * 4 * scale_factor
-                true_width = (init_width // scale_factor // 4) * 4 * scale_factor
-                true_img = imresize(true_img, (true_height, true_width))
+                shard_height = (init_height // scale_factor // 4) * 4 * scale_factor
+                shard_width = (init_width // scale_factor // 4) * 4 * scale_factor
+                true_img = imresize(true_img, (shard_height, shard_width))
 
-                print("Image has been modified to size (%d, %d)" % (true_height, true_width))
+                print("Image has been modified to size (%d, %d)" % (shard_height, shard_width))
 
         # Slicing old image into scale_factor number of shards.
-        true_shards = img_utils.split_image(true_img, scale_factor)
+        shards = img_utils.make_patch_grid(true_img, scale_factor, patch_size, patch_stride, verbose)
 
-        nb_shards = true_shards.shape[0]
-        true_height, true_width = true_shards.shape[1], true_shards.shape[2]
-        print("Number of shards = %d, Shard Shape = (%d, %d)" % (nb_shards, true_height, true_width))
+        nb_shards = shards.shape[0]
+        shard_height, shard_width = shards.shape[1], shards.shape[2]
+        print("Number of shards = %d, Shard Shape = (%d, %d)" % (nb_shards, shard_height, shard_width))
 
         model = None
-        holder = None
 
-        for i_shard in range(nb_shards):
-            # Pre Upscale
-            img = imresize(true_shards[i_shard], (true_height * scale_factor, true_width * scale_factor))
+        # Save intermediate bilinear scaled image is needed for comparison.
+        if save_intermediate:
+            if verbose: print("Saving intermediate image.")
+            fn = path[0] + "_intermediate_" + path[1]
+            intermediate_img = imresize(true_img, (init_height * scale_factor, init_width * scale_factor))
+            imsave(fn, intermediate_img)
 
-            # Save intermediate bilinear scaled image is needed for comparison.
-            if save_intermediate:
-                if verbose: print("Saving intermediate shard.")
-                fn = path[0] + "_intermediate_%d_" % (i_shard+1) + path[1]
-                imsave(fn, img)
+        # Compute new height
+        height, width = shard_height, shard_width
 
-            # Split the shard into multiple sub-shards
-            shards = img_utils.split_image(img, scale_factor)
+        # Transpose and Process images
+        img_conv = shards.transpose((0, 3, 1, 2)).astype('float64') / 255
 
-            # Compute new height
-            height, width = shards.shape[1], shards.shape[2]
+        if model == None:
+            model = self.create_model(height, width, load_weights=True)
+            if verbose: print("Model loaded.")
 
-            # Create a holder for the sub shards
-            if holder is None:
-                holder = np.empty((nb_shards, height * scale_factor, width * scale_factor, 3))
+        # Create prediction for image
+        result = model.predict(img_conv, batch_size=128, verbose=verbose)
 
-            # Transpose and Process images
-            img_conv = shards.transpose((0, 3, 1, 2)).astype('float64') / 255
+         # Deprocess
+        result = result.transpose((0, 2, 3, 1)).astype('float64') * 255
+        out_shape = (init_height * scale_factor, init_width * scale_factor, 3)
+        result = img_utils.combine_patches_grid(result, out_shape, scale_factor)
+        result = np.clip(result, 0, 255).astype('uint8')
 
-            if model == None:
-                model = self.create_model(height, width, load_weights=True)
-                if verbose: print("Model loaded.")
-
-            # Create prediction for image
-            result = model.predict(img_conv, verbose=verbose)
-            if verbose: print("Model finished upscaling shard %d." % (i_shard + 1))
-
-            # Deprocess
-            result = result.transpose((0, 2, 3, 1)).astype('float64') * 255
-            result = img_utils.merge_images(result, scale_factor)
-            result = np.clip(result, 0, 255).astype('uint8')
-
-            # Store intermediate shard into holder
-            holder[i_shard, :, :, :] = result
-
-            if verbose: print("Completed shard %d" % (i_shard + 1))
-
-        if verbose: print("Merging shards.")
-        final_result = img_utils.merge_images(holder, scale_factor)
+        if verbose: print("\nCompleted merging shards")
 
         if return_image:
-            # Return the image without saving. Usefull for testing images.
-            return final_result
+            # Return the image without saving. Useful for testing images.
+            return result
 
         if verbose: print("Saving image.")
-        imsave(filename, final_result)
+        imsave(filename, result)
 
         if evaluate:
-            # Evaluate agains bilinear upscaled image. Just to measure if a good result was obtained.
             if verbose: print("Evaluating results.")
 
-            # Shard true_img into peices
-            shards = img_utils.split_image(true_img, scale_factor)
-            true_height, true_width = shards.shape[1], shards.shape[2]
-
-            shards = shards.transpose((0, 3, 1, 2)).astype('float64') / 255
-
-            # Create a model to evaluate the shards and true image
-            eval_model = self.create_model(true_height, true_width, load_weights=True)
-
             # Evaluating the input image, which gets transformed to the output image, to the input image
-            error = eval_model.evaluate(shards, shards)
-            print("Mean Squared Error of %s (Compared to bilinear upscaling) : " % (self.model_name), error[0])
+            error = model.evaluate(img_conv, img_conv, batch_size=128)
+            print("\nMean Squared Error of %s (Compared to bilinear upscaling) : " % (self.model_name), error[0])
             print("Peak Signal to Noise Ratio of %s (Compared to bilinear upscaling) : " % (self.model_name), error[1])
 
 class ImageSuperResolutionModel(LearningModel):
