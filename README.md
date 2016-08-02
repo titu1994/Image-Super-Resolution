@@ -1,8 +1,9 @@
 # Image Super Resolution using Convolutional Neural Networks
 
 Implementation of Image Super Resolution CNN in Keras from the paper 
-<i><a href="https://arxiv.org/pdf/1501.00092v3.pdf">Image Super-Resolution Using Deep Convolutional Networks</a></i>. <br> 
-Also contains a model that outperforms the above mentioned model, termed Expanded Super Resolution, and another model termed Denoiseing Auto Encoder SRCNN which outperforms both of the above models.
+<i><a href="https://arxiv.org/pdf/1501.00092v3.pdf">Image Super-Resolution Using Deep Convolutional Networks</a></i>.
+
+Also contains models that outperforms the above mentioned model, termed Expanded Super Resolution, Denoiseing Auto Encoder SRCNN which outperforms both of the above models and Deep Denoise SR which is under development.
 
 ## Model Architecture
 ### Super Resolution CNN (SRCNN)
@@ -27,7 +28,7 @@ The "Expansion" occurs in the intermediate hidden layer, in which instead of jus
 ### Denoiseing (Auto Encoder) Super Resolution CNN (DSRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/Denoise.png" height=100% width=40%>
 
-The above is the "Denoiseing Auto Encoder SRCNN", which performs even better than Expanded SRCNN on Set5 (PSNR 34.88 dB vs 33.37 dB).
+The above is the "Denoiseing Auto Encoder SRCNN", which performs even better than Expanded SRCNN on Set5 (PSNR 36.28 dB vs 33.37 dB).
 
 This model uses bridge connections between the convolutional layers of the same level in order to speed up convergence and improve output results. The bridge connections are averaged to be more robust. 
 
@@ -36,7 +37,7 @@ Since the training images are passed through a gausian filter (sigma = 0.5), the
 ### Deep Denoiseing Super Resolution (DDSRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/Deep Denoise.png" height=100% width=40%>
 
-The above is the "Deep Denoiseing SRCNN", which is a modified form of the U-Net applied to image super-resolution. It performs far better than even the Denoiseing SRCNN, obtaining a high PSNR score on Set5 (PSNR 37.33 dB vs 34.88 dB).
+The above is the "Deep Denoiseing SRCNN", which is a modified form of the architecture described in the paper <a href="http://arxiv.org/abs/1606.08921">"Image Restoration Using Convolutional Auto-encoders with Symmetric Skip Connections"</a> applied to image super-resolution. It can perform far better than even the Denoiseing SRCNN, but is currently not working properly.
 
 Following the same principle as DSRCNN, it uses skip connections at same levels, but increases the depth of the network by cascading 2 CNNs at each level. This drastically increases the speed of learning, acheiving near 36.1~ dB validation PSNR value in the first 5 epochs on the 91 image dataset of the original SRCNN.
 
@@ -50,7 +51,7 @@ Considering the depth, and the vast number of parameters in the 30 layer archite
 The model weights are already provided in the weights folder, therefore simply running :<br>
 `python main.py "imgpath"`, where imgpath is a full path to the image.
 
-The default model is DDSRCNN, which outperforms the other three models. To switch models,<br>
+The default model is DSRCNN, which outperforms the other three models. To switch models,<br>
 `python main.py "imgpath" --model="type"`, where type = `sr`, `esr`, `dsr` or `ddsr`
 
 If the scaling factor needs to be altered then :<br>
@@ -62,10 +63,9 @@ If the intermediate step (bilinear scaled image) is needed, then:<br>
 ## Training
 If you wish to train the network on your own data set, follow these steps (Performance may vary) :
 <br><b>[1]</b> Save all of your input images of any size in the <b>"input_images"</b> folder
-<br><b>[2]</b> Open img_utils.py and manually compute the <b>nb_images</b>, located at line 10. 
 <br>(<b>nb_images = 400 * number of images in the "input_images" folder</b>). This is needed to efficiently create the sub-images.
-<br><b>[3]</b> Run img_utils.py function, `transform_images(input_path)`. By default, input_path is "input_images" path.
-<br><b>[4]</b> Open <b>tests.py</b> and un-comment the lines at model.fit(...), where model can be sr, esr or dsr. 
+<br><b>[2]</b> Run img_utils.py function, `transform_images(input_path)`. By default, input_path is "input_images" path.
+<br><b>[3]</b> Open <b>tests.py</b> and un-comment the lines at model.fit(...), where model can be sr, esr or dsr. 
 <br><b>Note: It may be useful to save the original weights in some other location.</b>
 <br><b>[4]</b> Execute tests.py to begin training. GPU is recommended, although if small number of images are provided then GPU may not be required.
 
@@ -74,11 +74,7 @@ Very large images may not work with the GPU. Therefore,
 <br>[1] If using Theano, set device="cpu" and cnmem=0.0 in theanorc.txt
 <br>[2] If using Tensorflow, set it to cpu mode
 
-On the CPU, extremely high resolution images of the size upto 6000 x 6000 pixels can be handled if 16 GB RAM is provided. It may be better to use high scaling factor for such large image (such as s = 4 or even 8), since images will be split into multiple subimages and processed one by one. Obviously this will produce extremely large images (24000 x 24000 or 48000 x 48000) which may not fit in memory thus an optimal setting must be found manually.
-
-Due to image splitting, processing and then merging, there are some visible mergeing artifacts remaining. I am attempting to find a method to merge the images without these sharp boundaries for each shard of the image.
-
-Denoiseing Auto Encoder requires MaxPooling and subsequent UpSampling of the input. Since there are 2 MaxPooling and 2 UpSampling layers, therefore the image size must be multiples of 4. In case the image size is not a multiple of 4, the image will be auto scaled to the nearest approximation of required size and then Denoiseing Auto Encoder upsampling will be performed.
+On the CPU, extremely high resolution images of the size upto 6000 x 6000 pixels can be handled if 16 GB RAM is provided. 
 
 ## Examples
 There are 14 extra images provided in results, 2 of which (Monarch Butterfly and Zebra) have been scaled using both bilinear, SRCNN, ESRCNN and DSRCNN.
