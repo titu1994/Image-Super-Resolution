@@ -1,5 +1,6 @@
 import main
 from keras.utils.visualize_util import plot
+from keras.models import load_model
 import models
 import img_utils
 
@@ -40,23 +41,22 @@ if __name__ == "__main__":
     """
     Train DenoisingAutoEncoderSR
     """
-    # NOTE: Denoising auto encoder requires even integer height x width. Thus the training images are downscaled.
-    #trainX, trainY = img_utils.loadDenoisingImages()
+    #trainX, trainY = img_utils.loadImages()
 
     #dsr = models.DenoisingAutoEncoderSR()
-    #dsr.create_model(load_weights=False).summary()
+    #dsr.create_model(load_weights=True).summary()
 
     #dsr.fit(trainX, trainY)
 
     """
     Train Deep Denoise SR
     """
-    #trainX, trainY = img_utils.loadDenoisingImages()
+    #trainX, trainY = img_utils.loadImages()
 
     #ddsr = models.DeepDenoiseSR()
     #ddsr.create_model(load_weights=False).summary()
 
-    #ddsr.fit(trainX, trainY, nb_epochs=60)
+    #ddsr.fit(trainX, trainY, nb_epochs=60, batch_size=128)
 
     """
     Compare output images of sr, esr, dsr and ddsr models
@@ -70,14 +70,10 @@ if __name__ == "__main__":
     #esr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="esr")
 
     #dsr = models.DenoisingAutoEncoderSR()
-    #dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr", patch_size=4)
-    # patch_size=32 is needed since Deconv is currently Conv + MaxPool | UpSample + Conv.
-    # This will be unnecessary when proper Deconv is implemented where MaxPool and UpSample wont be needed.
+    #dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr")
 
     #ddsr = models.DeepDenoiseSR()
-    #ddsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="ddsr", patch_size=4)
-    # patch_size=32 is needed since Deconv is currently Conv + MaxPool | UpSample + Conv.
-    # This will be unnecessary when proper Deconv is implemented where MaxPool and UpSample wont be needed.
+    #ddsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="ddsr")
 
 
 

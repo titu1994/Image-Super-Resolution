@@ -35,7 +35,7 @@ class LearningModel(object):
         self.n1 = 64
         self.n2 = 32
 
-    def create_model(self, height=33, width=33, channels=3, load_weights=False) -> Model:
+    def create_model(self, height=33, width=33, channels=3, load_weights=False, batch_size=128) -> Model:
         """
         Subclass dependent implementation.
         """
@@ -47,26 +47,27 @@ class LearningModel(object):
         Standard method to train any of the models.
         The last 2000 images belong to the Set5 Validation images.
         """
-        if self.model == None: self.create_model()
+        nb_train = trainX.shape[0] - 2000
+        trainX, testX = trainX[:nb_train, :, :, :], trainX[nb_train:, :, :, :]
+        trainY, testY = trainY[:nb_train, :, :, :], trainY[nb_train:, :, :, :]
 
-        callback = [callbacks.ModelCheckpoint(weight_fn, monitor='val_PSNRLoss', save_best_only=True,  mode='max'),]
-        if save_history: callback.append(HistoryCheckpoint(history_fn))
+        if self.model == None: self.create_model(batch_size=batch_size)
 
-        self.model.fit(trainX, trainY, batch_size=batch_size, nb_epoch=nb_epochs,
-                callbacks=callback, validation_split=2000. / 38400)
+        callback_list = [callbacks.ModelCheckpoint(weight_fn, monitor='val_PSNRLoss', save_best_only=True,  mode='max', save_weights_only=True),]
+        if save_history: callback_list.append(HistoryCheckpoint(history_fn))
+
+        self.model.fit(trainX, trainY, batch_size=batch_size,  nb_epoch=nb_epochs, callbacks=callback_list,
+                    validation_data=(testX, testY))
 
         return self.model
 
-    def evaluate(self, is_denoise=False):
+    def evaluate(self):
         """
         Evaluates the model on the Set5 Validation images
         """
         if self.model == None: self.create_model(load_weights=True)
 
-        if not is_denoise:
-            trainX, trainY = img_utils.loadImages()
-        else:
-            trainX, trainY = img_utils.loadDenoisingImages()
+        trainX, trainY = img_utils.loadImages()
 
         error = self.model.evaluate(trainX[-2000:], trainY[-2000:])
         print("Mean Squared Error : ", error[0])
@@ -82,6 +83,8 @@ class LearningModel(object):
         :param save_intermediate: saves the intermediate upscaled image (bilinear upscale)
         :param return_image: returns a image of shape (height, width, channels).
         :param suffix: suffix of upscaled image
+        :param patch_size: size of each patch grid
+        :param patch_stride: patch stride is generally 1.
         :param verbose: whether to print messages
         :param evaluate: evaluate the upscaled image on the original image.
         """
@@ -99,27 +102,12 @@ class LearningModel(object):
         if verbose: print("Old Size : ", true_img.shape)
         if verbose: print("New Size : (%d, %d, 3)" % (init_height * scale_factor, init_width * scale_factor))
 
-        # Denoiseing SR needs image size to be divisible by 4 (2 MaxPooling ops, 2 UpSampling ops).
-        # Also since we will be slicing the image, we need to compensate for that.
+        # Create patches
+        patches = img_utils.make_patches(true_img, scale_factor, patch_size, patch_stride, verbose)
 
-        denoise_models = ["Denoise AutoEncoder SR", "Deep Denoise SR"]
-
-        if self.model_name in denoise_models:
-            if (init_height // scale_factor % 4 != 0) or (init_width // scale_factor % 4 != 0):
-                print("Image shard size needs to be divisible by 4 to use denoise auto encoder.")
-                print("Resizing")
-                shard_height = (init_height // scale_factor // 4) * 4 * scale_factor
-                shard_width = (init_width // scale_factor // 4) * 4 * scale_factor
-                true_img = imresize(true_img, (shard_height, shard_width))
-
-                print("Image has been modified to size (%d, %d)" % (shard_height, shard_width))
-
-        # Slicing old image into scale_factor number of shards.
-        shards = img_utils.make_patch_grid(true_img, scale_factor, patch_size, patch_stride, verbose)
-
-        nb_shards = shards.shape[0]
-        shard_height, shard_width = shards.shape[1], shards.shape[2]
-        print("Number of shards = %d, Shard Shape = (%d, %d)" % (nb_shards, shard_height, shard_width))
+        nb_patches = patches.shape[0]
+        patch_height, patch_width = patches.shape[1], patches.shape[2]
+        print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_patches, patch_height, patch_width))
 
         model = None
 
@@ -130,23 +118,22 @@ class LearningModel(object):
             intermediate_img = imresize(true_img, (init_height * scale_factor, init_width * scale_factor))
             imsave(fn, intermediate_img)
 
-        # Compute new height
-        height, width = shard_height, shard_width
-
         # Transpose and Process images
-        img_conv = shards.transpose((0, 3, 1, 2)).astype('float64') / 255
+        img_conv = patches.transpose((0, 3, 1, 2)).astype('float64') / 255
 
         if model == None:
-            model = self.create_model(height, width, load_weights=True)
+            model = self.create_model(patch_height, patch_width, load_weights=True)
             if verbose: print("Model loaded.")
 
-        # Create prediction for image
+        # Create prediction for image patches
         result = model.predict(img_conv, batch_size=128, verbose=verbose)
 
-         # Deprocess
+         # Deprocess patches
         result = result.transpose((0, 2, 3, 1)).astype('float64') * 255
+
+        # Output shape is (original_height * scale, original_width * scale, nb_channels)
         out_shape = (init_height * scale_factor, init_width * scale_factor, 3)
-        result = img_utils.combine_patches_grid(result, out_shape, scale_factor)
+        result = img_utils.combine_patches(result, out_shape, scale_factor)
         result = np.clip(result, 0, 255).astype('uint8')
 
         if verbose: print("\nCompleted merging shards")
@@ -160,11 +147,14 @@ class LearningModel(object):
 
         if evaluate:
             if verbose: print("Evaluating results.")
+            # Convert initial image into patches
+            eval_img = img_utils.make_patches(true_img, scale_factor, patch_size, patch_stride, False, verbose)
+            eval_model = self.create_model(patch_height, patch_width, load_weights=True)
 
-            # Evaluating the input image, which gets transformed to the output image, to the input image
-            error = model.evaluate(img_conv, img_conv, batch_size=128)
-            print("\nMean Squared Error of %s (Compared to bilinear upscaling) : " % (self.model_name), error[0])
-            print("Peak Signal to Noise Ratio of %s (Compared to bilinear upscaling) : " % (self.model_name), error[1])
+            # Evaluating the initial image patches, which gets transformed to the output image, to the input image
+            error = eval_model.evaluate(eval_img, eval_img, batch_size=128)
+            print("\nMean Squared Error of %s  : " % (self.model_name), error[0])
+            print("Peak Signal to Noise Ratio of %s : " % (self.model_name), error[1])
 
 class ImageSuperResolutionModel(LearningModel):
 
@@ -175,7 +165,7 @@ class ImageSuperResolutionModel(LearningModel):
         self.f2 = 1
         self.f3 = 5
 
-    def create_model(self, height=33, width=33, channels=3, load_weights=False):
+    def create_model(self, height=33, width=33, channels=3, load_weights=False, batch_size=128):
         """
             Creates a model to be used to scale images of specific height and width.
         """
@@ -208,7 +198,7 @@ class ExpantionSuperResolution(LearningModel):
         self.f2_3 = 5
         self.f3 = 5
 
-    def create_model(self, height=33, width=33, channels=3, load_weights=False):
+    def create_model(self, height=33, width=33, channels=3, load_weights=False, batch_size=128):
         """
             Creates a model to be used to scale images of specific height and width.
         """
@@ -241,34 +231,28 @@ class DenoisingAutoEncoderSR(LearningModel):
     def __init__(self):
         super(DenoisingAutoEncoderSR, self).__init__("Denoise AutoEncoder SR")
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False):
+    def create_model(self, height=33, width=33, channels=3, load_weights=False, batch_size=128):
         """
             Creates a model to remove / reduce noise from upscaled images.
         """
-        from keras.layers.convolutional import MaxPooling2D, UpSampling2D
+        from keras.layers.convolutional import Deconvolution2D
         from keras.layers import merge
 
         init = Input(shape=(channels, height, width))
 
         level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
-        x = MaxPooling2D((2,2))(level1_1)
-        level2_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(x)
-        x = MaxPooling2D((2,2))(level2_1)
+        level2_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_1)
 
-        level3 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(x)
-        x = UpSampling2D((2, 2))(level3)
+        level2_2 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(level2_1)
+        level2 = merge([level2_1, level2_2], mode='sum')
 
-        level2_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(x)
-        level2 = merge([level2_1, level2_2], mode='ave')
-
-        x = UpSampling2D((2, 2))(level2)
-        level1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(x)
-        level1 = merge([level1_1, level1_2], mode='ave')
+        level1_2 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(level2)
+        level1 = merge([level1_1, level1_2], mode='sum')
 
         decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(level1)
 
         model = Model(init, decoded)
-        model.compile(optimizer='adadelta', loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer='adam', loss='mse', metrics=[PSNRLoss])
         if load_weights: model.load_weights("weights/Denoising AutoEncoder.h5")
 
         self.model = model
@@ -278,53 +262,48 @@ class DenoisingAutoEncoderSR(LearningModel):
                             save_history=True, history_fn="DSRCNN History.txt"):
         return super(DenoisingAutoEncoderSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
-    def evaluate(self, is_denoise=False):
+    def evaluate(self):
         """
         Evaluates the model on the Set5 Validation images
         """
-        super(DenoisingAutoEncoderSR, self).evaluate(is_denoise=True)
+        super(DenoisingAutoEncoderSR, self).evaluate()
+
+"""
+#This model is currently under development. Crashes due to Input dimension mis-match.
 
 class DeepDenoiseSR(LearningModel):
 
     def __init__(self):
+        raise NotImplementedError()
+
         super(DeepDenoiseSR, self).__init__("Deep Denoise SR")
 
         self.n1 = 64
         self.n2 = 128
-        self.n3 = 256
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False):
-        """
-        Creates a model to remove / reduce noise from upscaled images.
-        Based on the U-Net Architecture.
-        """
-        from keras.layers.convolutional import MaxPooling2D, UpSampling2D
+    def create_model(self, height=33, width=33, channels=3, load_weights=False, batch_size=128):
+        from keras.layers.convolutional import Deconvolution2D
         from keras.layers import merge
 
         init = Input(shape=(channels, height, width))
 
-        level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
-        level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_1)
-        x = MaxPooling2D((2, 2))(level1_1)
+        c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
+        c2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(c1)
 
-        level2_1 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(x)
-        level2_1 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(level2_1)
-        x = MaxPooling2D((2, 2))(level2_1)
+        c3 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(c2)
+        c4 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(c3)
 
-        level3 = Convolution2D(self.n3, 3, 3, activation='relu', border_mode='same')(x)
-        x = UpSampling2D((2, 2))(level3)
+        d1 = Deconvolution2D(self.n2, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(c4)
+        d2 = Deconvolution2D(self.n2, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(d1)
 
-        level2_2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(x)
-        level2_2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(level2_2)
-        level2 = merge([level2_1, level2_2], mode='sum')
+        m1 = merge([c3, d2], mode='sum')
 
-        x = UpSampling2D((2, 2))(level2)
+        d3 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(m1)
+        d4 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(d3)
 
-        level1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(x)
-        level1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_2)
-        level1 = merge([level1_1, level1_2], mode='sum')
+        m2 = merge([c1, d4], mode='sum')
 
-        decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(level1)
+        decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(m2)
 
         model = Model(init, decoded)
         model.compile(optimizer='adam', loss='mse', metrics=[PSNRLoss])
@@ -337,6 +316,6 @@ class DeepDenoiseSR(LearningModel):
                          save_history=True, history_fn="Deep DSRCNN History.txt"):
         super(DeepDenoiseSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
-    def evaluate(self, is_denoise=True):
-        super(DeepDenoiseSR, self).evaluate(is_denoise)
-
+    def evaluate(self):
+        super(DeepDenoiseSR, self).evaluate()
+"""

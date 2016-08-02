@@ -7,8 +7,7 @@ import os
 
 scaling_factor = 3
 fsub = 33
-imgsize = 400
-nb_images = 38400 # 96 x 400 (each of 33 x 33 pixels)
+nb_imgs = 400
 
 input_path = r"input_images\\"
 output_path_X = r"output_images_X\\"
@@ -20,8 +19,20 @@ if not os.path.exists(output_path_X):
 if not os.path.exists(output_path_Y):
     os.makedirs(output_path_Y)
 
-def loadImages():
-    import os
+def loadImages(from_file=True):
+    # Compute number of images
+    nb_images = len([name for name in os.listdir(output_path_X)])
+    print("Loading %d images." % (nb_images))
+
+    if from_file:
+        try:
+            dataX = np.load(r'arrays\DATA_X.npy')
+            dataY = np.load(r'arrays\DATA_Y.npy')
+            print('Loaded images from file.')
+            return (dataX, dataY)
+        except:
+            print('Could not load numpy array from file. Loading from images...')
+
     # Hold the images
     dataX = np.zeros((nb_images, 3, fsub, fsub))
     dataY = np.zeros((nb_images, 3, fsub, fsub))
@@ -37,29 +48,13 @@ def loadImages():
         x = x.transpose((2, 0, 1)).astype('float64') / 255
         dataY[i, :, :, :] = x
 
-        if i % 1000 == 0  : print('%f percent loaded.' % (i * 100/ nb_images))
-    return (dataX, dataY)
+        if i % 1000 == 0  : print('%0.2f percent images loaded.' % (i * 100 / nb_images))
 
-def loadDenoisingImages():
-    import os
-    # Hold the images
-    dataX = np.zeros((nb_images, 3, fsub-1, fsub-1))
-    dataY = np.zeros((nb_images, 3, fsub-1, fsub-1))
+    if not os.path.exists(r'arrays\\'):
+        os.makedirs(r'arrays\\')
+        np.save(r'arrays\DATA_X.npy', dataX)
+        np.save(r'arrays\DATA_Y.npy', dataY)
 
-    for i, file in enumerate(os.listdir(output_path_Y)):
-        # Training images are blurred versions ('Y' according to paper)
-        y = imread(output_path_Y + file, mode="RGB")
-        y = imresize(y, (fsub-1, fsub-1))
-        y = y.transpose((2, 0, 1)).astype('float64') / 255
-        dataX[i, :, :, :] = y
-
-        # Non blurred images ('X' according to paper)
-        x = imread(output_path_X + file, mode="RGB")
-        x = imresize(x, (fsub-1, fsub-1))
-        x = x.transpose((2, 0, 1)).astype('float64') / 255
-        dataY[i, :, :, :] = x
-
-        if i % 1000 == 0: print('%f percent loaded.' % (i * 100 / nb_images))
     return (dataX, dataY)
 
 def transform_images(directory):
@@ -68,18 +63,21 @@ def transform_images(directory):
     index = 1
 
     # For each image in input_images directory
+    nb_images = len([name for name in os.listdir(directory)])
+    print("Transforming %d images." % (nb_images))
+
     for file in os.listdir(directory):
         img = imread(input_path + file, mode='RGB')
 
         # Resize to 400 x 400
-        img = imresize(img, (imgsize, imgsize))
+        img = imresize(img, (nb_imgs, nb_imgs))
 
         # Create patches
-        patches = image.extract_patches_2d(img, (fsub, fsub), max_patches=imgsize)
+        patches = image.extract_patches_2d(img, (fsub, fsub), max_patches=nb_imgs)
 
         t1 = time.time()
         # Create 400 'X' and 'Y' sub-images of size 33 x 33 for each patch
-        for i in range(imgsize):
+        for i in range(nb_imgs):
             ip = patches[i]
             # Save ground truth image X
             imsave(output_path_X + "%d_%d.png" % (index, i+1), ip)
@@ -147,23 +145,18 @@ def merge_images(imgs, scaling_factor):
 
     return img
 
-def make_patch_grid(x, scale, patch_size, patch_stride=1, verbose=1):
+def make_patches(x, scale, patch_size, patch_stride=1, upscale=True, verbose=1):
     '''x shape: (num_channels, rows, cols)'''
-    #x = x.transpose(2, 1, 0)
-    height, width = x.shape[0:2]
-    x = imresize(x, (height * scale, width * scale))
+    height, width = x.shape[:2]
+    if upscale: x = imresize(x, (height * scale, width * scale))
     patches = extract_patches_2d(x, (patch_size, patch_size))
     return patches
 
 
-def combine_patches_grid(in_patches, out_shape, scale):
-    '''Reconstruct an image from these `patches`
-
-    input shape: (rows, cols, channels, patch_row, patch_col)
-    '''
+def combine_patches(in_patches, out_shape, scale):
+    '''Reconstruct an image from these `patches`'''
     recon = reconstruct_from_patches_2d(in_patches, out_shape)
     return recon
-
 
 if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images

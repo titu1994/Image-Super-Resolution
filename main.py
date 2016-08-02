@@ -5,7 +5,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Up-Scales an image using Image Super Resolution Model")
     parser.add_argument("imgpath", type=str, help="Path to input image")
-    parser.add_argument("--model", type=str, default="ddsr", help="Use either image super resolution (sr), "
+    parser.add_argument("--model", type=str, default="dsr", help="Use either image super resolution (sr), "
                         "expanded super resolution (esr), denoising auto encoder sr (dsr) or "
                         "deep denoising sr (ddsr)")
     parser.add_argument("--scale", default=2, help='Scaling factor. Default = 2x')
