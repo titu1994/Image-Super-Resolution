@@ -5,6 +5,15 @@ Implementation of Image Super Resolution CNN in Keras from the paper
 
 Also contains models that outperforms the above mentioned model, termed Expanded Super Resolution, Denoiseing Auto Encoder SRCNN which outperforms both of the above models and Deep Denoise SR which is under development.
 
+## Setup
+Since it uses deconvolutions, which are available only in the master branch of Keras and Theano at the moment, the requirements are as follows:
+
+```
+pip install git+https://github.com/fchollet/keras.git --upgrade
+
+pip install git+https://github.com/Theano/Theano.git --upgrade --no-deps
+```
+
 ## Model Architecture
 ### Super Resolution CNN (SRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/SRCNN.png" height=100% width=25%>
@@ -51,7 +60,7 @@ Considering the depth, and the vast number of parameters in the 30 layer archite
 The model weights are already provided in the weights folder, therefore simply running :<br>
 `python main.py "imgpath"`, where imgpath is a full path to the image.
 
-The default model is DSRCNN, which outperforms the other three models. To switch models,<br>
+The default model is DSRCNN (dsr), which outperforms the other three models. To switch models,<br>
 `python main.py "imgpath" --model="type"`, where type = `sr`, `esr`, `dsr` or `ddsr`
 
 If the scaling factor needs to be altered then :<br>
@@ -63,7 +72,6 @@ If the intermediate step (bilinear scaled image) is needed, then:<br>
 ## Training
 If you wish to train the network on your own data set, follow these steps (Performance may vary) :
 <br><b>[1]</b> Save all of your input images of any size in the <b>"input_images"</b> folder
-<br>(<b>nb_images = 400 * number of images in the "input_images" folder</b>). This is needed to efficiently create the sub-images.
 <br><b>[2]</b> Run img_utils.py function, `transform_images(input_path)`. By default, input_path is "input_images" path.
 <br><b>[3]</b> Open <b>tests.py</b> and un-comment the lines at model.fit(...), where model can be sr, esr or dsr. 
 <br><b>Note: It may be useful to save the original weights in some other location.</b>
