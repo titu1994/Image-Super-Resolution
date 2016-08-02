@@ -61,13 +61,16 @@ class LearningModel(object):
 
         return self.model
 
-    def evaluate(self):
+    def evaluate(self, is_denoise=False):
         """
         Evaluates the model on the Set5 Validation images
         """
         if self.model == None: self.create_model(load_weights=True)
 
-        trainX, trainY = img_utils.loadImages()
+        if not is_denoise:
+            trainX, trainY = img_utils.loadImages()
+        else:
+            trainX, trainY = img_utils.loadDenoiseImages()
 
         error = self.model.evaluate(trainX[-2000:], trainY[-2000:])
         print("Mean Squared Error : ", error[0])
@@ -102,7 +105,13 @@ class LearningModel(object):
         if verbose: print("Old Size : ", true_img.shape)
         if verbose: print("New Size : (%d, %d, 3)" % (init_height * scale_factor, init_width * scale_factor))
 
+        denoise_models = ['Deep Denoise SR']
+
         # Create patches
+        if self.model_name in denoise_models:
+            print("Deep Denoise requires patch size which is multiple of 4.\n Setting patch_size = 4.")
+            patch_size = 4
+
         patches = img_utils.make_patches(true_img, scale_factor, patch_size, patch_stride, verbose)
 
         nb_patches = patches.shape[0]
@@ -262,51 +271,57 @@ class DenoisingAutoEncoderSR(LearningModel):
                             save_history=True, history_fn="DSRCNN History.txt"):
         return super(DenoisingAutoEncoderSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
-    def evaluate(self):
+    def evaluate(self, is_denoise=True):
         """
         Evaluates the model on the Set5 Validation images
         """
-        super(DenoisingAutoEncoderSR, self).evaluate()
+        super(DenoisingAutoEncoderSR, self).evaluate(is_denoise)
 
-"""
-#This model is currently under development. Crashes due to Input dimension mis-match.
 
 class DeepDenoiseSR(LearningModel):
 
     def __init__(self):
-        raise NotImplementedError()
-
         super(DeepDenoiseSR, self).__init__("Deep Denoise SR")
 
         self.n1 = 64
         self.n2 = 128
+        self.n3 = 256
 
-    def create_model(self, height=33, width=33, channels=3, load_weights=False, batch_size=128):
-        from keras.layers.convolutional import Deconvolution2D
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
+        from keras.layers.convolutional import MaxPooling2D, UpSampling2D
         from keras.layers import merge
 
         init = Input(shape=(channels, height, width))
 
         c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
-        c2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(c1)
+        c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(c1)
 
-        c3 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(c2)
-        c4 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(c3)
+        x = MaxPooling2D((2, 2))(c1)
 
-        d1 = Deconvolution2D(self.n2, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(c4)
-        d2 = Deconvolution2D(self.n2, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(d1)
+        c2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(x)
+        c2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(c2)
 
-        m1 = merge([c3, d2], mode='sum')
+        x = MaxPooling2D((2, 2))(c2)
 
-        d3 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(m1)
-        d4 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(d3)
+        c3 = Convolution2D(self.n3, 3, 3, activation='relu', border_mode='same')(x)
 
-        m2 = merge([c1, d4], mode='sum')
+        x = UpSampling2D()(c3)
+
+        c2_2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(x)
+        c2_2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(c2_2)
+
+        m1 = merge([c2, c2_2], mode='sum')
+        m1 = UpSampling2D()(m1)
+
+        c1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(m1)
+        c1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(c1_2)
+
+        m2 = merge([c1, c1_2], mode='sum')
 
         decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(m2)
 
         model = Model(init, decoded)
-        model.compile(optimizer='adam', loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer='adadelta', loss='mse', metrics=[PSNRLoss])
         if load_weights: model.load_weights("weights/Deep Denoise Weights.h5")
 
         self.model = model
@@ -316,6 +331,5 @@ class DeepDenoiseSR(LearningModel):
                          save_history=True, history_fn="Deep DSRCNN History.txt"):
         super(DeepDenoiseSR, self).fit(trainX, trainY, weight_fn, batch_size, nb_epochs, save_history, history_fn)
 
-    def evaluate(self):
-        super(DeepDenoiseSR, self).evaluate()
-"""
+    def evaluate(self, is_denoise=True):
+        super(DeepDenoiseSR, self).evaluate(is_denoise)

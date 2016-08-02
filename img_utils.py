@@ -50,10 +50,50 @@ def loadImages(from_file=True):
 
         if i % 1000 == 0  : print('%0.2f percent images loaded.' % (i * 100 / nb_images))
 
-    if not os.path.exists(r'arrays\\'):
-        os.makedirs(r'arrays\\')
+    if not os.path.exists(r'arrays\DATA_X.npy') or not os.path.exists(r'arrays\DATA_Y.npy'):
+        if not os.path.exists(r'arrays\\'): os.makedirs(r'arrays\\')
         np.save(r'arrays\DATA_X.npy', dataX)
         np.save(r'arrays\DATA_Y.npy', dataY)
+
+    return (dataX, dataY)
+
+def loadDenoiseImages(from_file=True):
+    # Compute number of images
+    nb_images = len([name for name in os.listdir(output_path_X)])
+    print("Loading %d images." % (nb_images))
+
+    if from_file:
+        try:
+            dataX = np.load(r'arrays\DENOISE_DATA_X.npy')
+            dataY = np.load(r'arrays\DENOISE_DATA_Y.npy')
+            print('Loaded images from file.')
+            return (dataX, dataY)
+        except:
+            print('Could not load numpy array from file. Loading from images...')
+
+    # Hold the images
+    dataX = np.zeros((nb_images, 3, fsub-1, fsub-1))
+    dataY = np.zeros((nb_images, 3, fsub-1, fsub-1))
+
+    for i, file in enumerate(os.listdir(output_path_Y)):
+        # Training images are blurred versions ('Y' according to paper)
+        y = imread(output_path_Y + file, mode="RGB")
+        y = imresize(y, (fsub-1, fsub-1))
+        y = y.transpose((2, 0, 1)).astype('float64') / 255
+        dataX[i, :, :, :] = y
+
+        # Non blurred images ('X' according to paper)
+        x = imread(output_path_X + file, mode="RGB")
+        x = imresize(x, (fsub-1, fsub-1))
+        x = x.transpose((2, 0, 1)).astype('float64') / 255
+        dataY[i, :, :, :] = x
+
+        if i % 1000 == 0  : print('%0.2f percent images loaded.' % (i * 100 / nb_images))
+
+    if not os.path.exists(r'arrays\DENOISE_DATA_X.npy' or not os.path.exists(r'arrays\DENOISE_DATA_Y.npy')):
+        if not os.path.exists(r'arrays\\'): os.makedirs(r'arrays\\')
+        np.save(r'arrays\DENOISE_DATA_X.npy', dataX)
+        np.save(r'arrays\DENOISE_DATA_Y.npy', dataY)
 
     return (dataX, dataY)
 

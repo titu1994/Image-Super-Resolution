@@ -51,7 +51,7 @@ if __name__ == "__main__":
     """
     Train Deep Denoise SR
     """
-    #trainX, trainY = img_utils.loadImages()
+    #trainX, trainY = img_utils.loadDenoiseImages()
 
     #ddsr = models.DeepDenoiseSR()
     #ddsr.create_model(load_weights=False).summary()
