@@ -50,7 +50,7 @@ The above is the "Deep Denoiseing SRCNN", which is a modified form of the archit
 
 Following the same principle as DSRCNN, it uses skip connections at same levels, but increases the depth of the network by cascading 2 CNNs at each level. This drastically increases the speed of learning, acheiving near 36.1~ dB validation PSNR value in the first 5 epochs on the 91 image dataset of the original SRCNN.
 
-Similar to the paper <a href="http://arxiv.org/abs/1606.08921">Image Restoration Using Convolutional Auto-encoders with Symmetric Skip Connections</a>, this can be considered a highly simplified and shallow model compared to the 30 layer architecture used in the above paper. However even with just 8 layers, DDSRCNN acheives very high PSNR score, close to the scores in the paper (37.56 dB for 30-layer architecture vs 37.33 dB for 8 layer DDSRCNN architecture) on Set5 validation images.
+Similar to the paper <a href="http://arxiv.org/abs/1606.08921">Image Restoration Using Convolutional Auto-encoders with Symmetric Skip Connections</a>, this can be considered a highly simplified and shallow model compared to the 30 layer architecture used in the above paper. However even with just 8 layers, DDSRCNN acheives very high PSNR score, close to the scores in the paper (37.56 dB for 30-layer architecture vs 37.46 dB for 8 layer DDSRCNN architecture) on Set5 validation images.
 
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/DDSRCNN%20validation%20plot.png" width=100% height=100%>
 
