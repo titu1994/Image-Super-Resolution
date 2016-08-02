@@ -3,7 +3,7 @@
 Implementation of Image Super Resolution CNN in Keras from the paper 
 <i><a href="https://arxiv.org/pdf/1501.00092v3.pdf">Image Super-Resolution Using Deep Convolutional Networks</a></i>.
 
-Also contains models that outperforms the above mentioned model, termed Expanded Super Resolution, Denoiseing Auto Encoder SRCNN which outperforms both of the above models and Deep Denoise SR which is under development.
+Also contains models that outperforms the above mentioned model, termed Expanded Super Resolution, Denoiseing Auto Encoder SRCNN which outperforms both of the above models and Deep Denoise SR, which with certain limitations, outperforms all of the above.
 
 ## Setup
 Since it uses deconvolutions, which are available only in the master branch of Keras and Theano at the moment, the requirements are as follows:
@@ -50,9 +50,7 @@ The above is the "Deep Denoiseing SRCNN", which is a modified form of the archit
 
 Following the same principle as DSRCNN, it uses skip connections at same levels, but increases the depth of the network by cascading 2 CNNs at each level. This drastically increases the speed of learning, acheiving near 36.1~ dB validation PSNR value in the first 5 epochs on the 91 image dataset of the original SRCNN.
 
-Similar to the paper <a href="http://arxiv.org/abs/1606.08921">Image Restoration Using Convolutional Auto-encoders with Symmetric Skip Connections</a>, this can be considered a highly simplified and shallow model compared to the 30 layer architecture used in the above paper. 
-
-Due to implementation issues, this is currently under development. 
+Similar to the paper <a href="http://arxiv.org/abs/1606.08921">Image Restoration Using Convolutional Auto-encoders with Symmetric Skip Connections</a>, this can be considered a highly simplified and shallow model compared to the 30 layer architecture used in the above paper. However even with just 8 layers, DDSRCNN acheives very high PSNR score, close to the scores in the paper (37.56 dB for 30-layer architecture vs 37.33 dB for 8 layer DDSRCNN architecture) on Set5 validation images.
 
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/DDSRCNN%20validation%20plot.png" width=100% height=100%>
 
@@ -61,7 +59,7 @@ The model weights are already provided in the weights folder, therefore simply r
 `python main.py "imgpath"`, where imgpath is a full path to the image.
 
 The default model is DSRCNN (dsr), which outperforms the other three models. To switch models,<br>
-`python main.py "imgpath" --model="type"`, where type = `sr`, `esr`, `dsr`
+`python main.py "imgpath" --model="type"`, where type = `sr`, `esr`, `dsr`, `ddsr`
 
 If the scaling factor needs to be altered then :<br>
 `python main.py "imgpath" --scale=s`, where s can be any number. Default `s = 2`
@@ -92,7 +90,7 @@ Bilinear
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_intermediate.jpg" width=25% height=25%> SRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_sr(2x).jpg" width=25% height=25%> <br>ESRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_esr(2x).jpg" width=25% height=25%> 
-DSRCNN
+DDSRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/monarch_ddsr(2x).png" height=25% width=25%>
 
 ### Zebra
@@ -101,5 +99,5 @@ Bilinear
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_sr(2x).jpg" width=25% height=25%>
 <br>ESRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_esr(2x).jpg" width=25% height=25%>
-DSRCNN
+DDSRCNN
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/results/zebra_ddsr(2x).png" width=25% height=25%>
