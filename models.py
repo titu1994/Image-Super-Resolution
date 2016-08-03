@@ -321,7 +321,7 @@ class DeepDenoiseSR(LearningModel):
         decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(m2)
 
         model = Model(init, decoded)
-        model.compile(optimizer='adadelta', loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer='adam', loss='mse', metrics=[PSNRLoss])
         if load_weights: model.load_weights("weights/Deep Denoise Weights.h5")
 
         self.model = model
