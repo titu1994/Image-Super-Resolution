@@ -32,4 +32,4 @@ elif model_type == "dsr":
 elif model_type == "ddsr":
     model = models.DeepDenoiseSR()
 
-model.upscale(path, scale_factor=scale_factor, save_intermediate=save)
+model.upscale(path, scale_factor=scale_factor, save_intermediate=save, evaluate=False)
