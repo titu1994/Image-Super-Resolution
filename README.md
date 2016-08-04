@@ -14,6 +14,29 @@ pip install git+https://github.com/fchollet/keras.git --upgrade
 pip install git+https://github.com/Theano/Theano.git --upgrade --no-deps
 ```
 
+## Usage
+The model weights are already provided in the weights folder, therefore simply running :<br>
+`python main.py "imgpath"`, where imgpath is a full path to the image.
+
+The default model is DSRCNN (dsr), which outperforms the other three models. To switch models,<br>
+`python main.py "imgpath" --model="type"`, where type = `sr`, `esr`, `dsr`, `ddsr`
+
+If the scaling factor needs to be altered then :<br>
+`python main.py "imgpath" --scale=s`, where s can be any number. Default `s = 2`
+
+If the intermediate step (bilinear scaled image) is needed, then:<br>
+`python main.py "imgpath" --scale=s --save_intermediate="True"`
+
+## Window Helper
+The windows_helper script contains a C# program for Windows to easily use the Super Resolution script using any of the available models.
+
+## Parameters
+```
+--model : Can be one of "sr" (Image Super Resolution), "esr" (Expanded SR), "dsr" (Denoiseing Auto Encoder SR), "ddsr" (Deep Denoise SR)
+--scale : Scaling factor can be any integer number. Default is 2x scaling.
+--save_intermediate= : Save the intermediate results before applying the Super Resolution algorithm.
+```
+
 ## Model Architecture
 ### Super Resolution CNN (SRCNN)
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/SRCNN.png" height=100% width=25%>
@@ -53,19 +76,6 @@ Following the same principle as DSRCNN, it uses skip connections at same levels,
 Similar to the paper <a href="http://arxiv.org/abs/1606.08921">Image Restoration Using Convolutional Auto-encoders with Symmetric Skip Connections</a>, this can be considered a highly simplified and shallow model compared to the 30 layer architecture used in the above paper. However even with just 8 layers, DDSRCNN acheives very high PSNR score, close to the scores in the paper (37.56 dB for 30-layer architecture vs 37.46 dB for 8 layer DDSRCNN architecture) on Set5 validation images.
 
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/DDSRCNN%20validation%20plot.png" width=100% height=100%>
-
-## Usage
-The model weights are already provided in the weights folder, therefore simply running :<br>
-`python main.py "imgpath"`, where imgpath is a full path to the image.
-
-The default model is DSRCNN (dsr), which outperforms the other three models. To switch models,<br>
-`python main.py "imgpath" --model="type"`, where type = `sr`, `esr`, `dsr`, `ddsr`
-
-If the scaling factor needs to be altered then :<br>
-`python main.py "imgpath" --scale=s`, where s can be any number. Default `s = 2`
-
-If the intermediate step (bilinear scaled image) is needed, then:<br>
-`python main.py "imgpath" --scale=s --save_intermediate="True"`
 
 ## Training
 If you wish to train the network on your own data set, follow these steps (Performance may vary) :
