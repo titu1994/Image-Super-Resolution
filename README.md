@@ -1,4 +1,4 @@
-# Image Super Resolution using Convolutional Neural Networks
+# Image Super Resolution using in Keras
 
 Implementation of Image Super Resolution CNN in Keras from the paper 
 <i><a href="https://arxiv.org/pdf/1501.00092v3.pdf">Image Super-Resolution Using Deep Convolutional Networks</a></i>.
