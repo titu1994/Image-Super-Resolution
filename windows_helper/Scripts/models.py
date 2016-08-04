@@ -92,7 +92,7 @@ class LearningModel(object):
         :param evaluate: evaluate the upscaled image on the original image.
         """
         import os
-        from scipy.misc import imread, imresize, imsave
+        from scipy.misc import imread, imresize, imsave, imfilter
 
         # Destination path
         path = os.path.splitext(img_path)
@@ -144,6 +144,7 @@ class LearningModel(object):
         out_shape = (init_height * scale_factor, init_width * scale_factor, 3)
         result = img_utils.combine_patches(result, out_shape, scale_factor)
         result = np.clip(result, 0, 255).astype('uint8')
+        result = imfilter(result, 'smooth_more')
 
         if verbose: print("\nCompleted merging shards")
 

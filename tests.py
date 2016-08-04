@@ -1,6 +1,4 @@
-import main
 from keras.utils.visualize_util import plot
-from keras.models import load_model
 import models
 import img_utils
 
@@ -19,6 +17,7 @@ if __name__ == "__main__":
     #plot(model, to_file="architectures/Denoise.png", show_layer_names=True, show_shapes=True)
     #model = models.DeepDenoiseSR().create_model()
     #plot(model, to_file="architectures/Deep Denoise.png", show_layer_names=True, show_shapes=True)
+
 
     """
     Train Super Resolution
