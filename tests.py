@@ -75,4 +75,3 @@ if __name__ == "__main__":
     #ddsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="ddsr")
 
 
-

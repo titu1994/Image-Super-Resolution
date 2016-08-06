@@ -185,7 +185,7 @@ def merge_images(imgs, scaling_factor):
 
     return img
 
-def make_patches(x, scale, patch_size, patch_stride=1, upscale=True, verbose=1):
+def make_patches(x, scale, patch_size, upscale=True, verbose=1):
     '''x shape: (num_channels, rows, cols)'''
     height, width = x.shape[:2]
     if upscale: x = imresize(x, (height * scale, width * scale))

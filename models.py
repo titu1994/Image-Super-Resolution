@@ -77,7 +77,7 @@ class LearningModel(object):
         print("Peak Signal to Noise Ratio : ", error[1])
 
     def upscale(self, img_path, scale_factor=2, save_intermediate=False, return_image=False, suffix="scaled",
-                patch_size=3, patch_stride=1, verbose=True, evaluate=True):
+                patch_size=8, mode="patch", verbose=True, evaluate=True):
         """
         Standard method to upscale an image.
 
@@ -105,22 +105,34 @@ class LearningModel(object):
         if verbose: print("Old Size : ", true_img.shape)
         if verbose: print("New Size : (%d, %d, 3)" % (init_height * scale_factor, init_width * scale_factor))
 
+        images = None
+        img_height, img_width = 0, 0
+
         denoise_models = ['Deep Denoise SR']
 
-        # Create patches
-        if self.model_name in denoise_models:
-            print("Deep Denoise requires patch size which is multiple of 4.\n Setting patch_size = 4.")
-            patch_size = 4
+        if mode == 'patch':
+            # Create patches
+            if self.model_name in denoise_models:
+                if patch_size % 4 != 0:
+                    print("Deep Denoise requires patch size which is multiple of 4.\nSetting patch_size = 8.")
+                    patch_size = 8
 
-        patches = img_utils.make_patches(true_img, scale_factor, patch_size, patch_stride, verbose)
+            images = img_utils.make_patches(true_img, scale_factor, patch_size, verbose)
 
-        nb_patches = patches.shape[0]
-        patch_height, patch_width = patches.shape[1], patches.shape[2]
-        print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_patches, patch_height, patch_width))
+            nb_images = images.shape[0]
+            img_height, img_width = images.shape[1], images.shape[2]
+            print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_images, img_height, img_width))
+        else:
+            # Use full image for super resolution
+            img_height, img_width = self.__match_denoise_size(denoise_models, img_height, img_width, init_height,
+                                                              init_width, scale_factor)
 
-        model = None
+            images = imresize(true_img, (img_height, img_width))
+            images = np.expand_dims(images, axis=0)
+            print("Image is reshaped to : (%d, %d, %d)" % (images.shape[1], images.shape[2], images.shape[3]))
 
         # Save intermediate bilinear scaled image is needed for comparison.
+        intermediate_img = None
         if save_intermediate:
             if verbose: print("Saving intermediate image.")
             fn = path[0] + "_intermediate_" + path[1]
@@ -128,25 +140,30 @@ class LearningModel(object):
             imsave(fn, intermediate_img)
 
         # Transpose and Process images
-        img_conv = patches.transpose((0, 3, 1, 2)).astype('float64') / 255
+        img_conv = images.transpose((0, 3, 1, 2)).astype('float64') / 255
 
-        if model == None:
-            model = self.create_model(patch_height, patch_width, load_weights=True)
-            if verbose: print("Model loaded.")
+        model = self.create_model(img_height, img_width, load_weights=True)
+        if verbose: print("Model loaded.")
 
         # Create prediction for image patches
         result = model.predict(img_conv, batch_size=128, verbose=verbose)
+
+        if verbose: print("De-processing images.")
 
          # Deprocess patches
         result = result.transpose((0, 2, 3, 1)).astype('float64') * 255
 
         # Output shape is (original_height * scale, original_width * scale, nb_channels)
-        out_shape = (init_height * scale_factor, init_width * scale_factor, 3)
-        result = img_utils.combine_patches(result, out_shape, scale_factor)
+        if mode == 'patch':
+            out_shape = (init_height * scale_factor, init_width * scale_factor, 3)
+            result = img_utils.combine_patches(result, out_shape, scale_factor)
+        else:
+            result = result[0, :, :, :] # Access the 3 Dimensional image vector
+
         result = np.clip(result, 0, 255).astype('uint8')
         result = imfilter(result, 'smooth_more')
 
-        if verbose: print("\nCompleted merging shards")
+        if verbose: print("\nCompleted De-processing image.")
 
         if return_image:
             # Return the image without saving. Useful for testing images.
@@ -157,14 +174,39 @@ class LearningModel(object):
 
         if evaluate:
             if verbose: print("Evaluating results.")
-            # Convert initial image into patches
-            eval_img = img_utils.make_patches(true_img, scale_factor, patch_size, patch_stride, False, verbose)
-            eval_model = self.create_model(patch_height, patch_width, load_weights=True)
+            # Convert initial image into correct format
+            if intermediate_img is None:
+                intermediate_img = imresize(true_img, (init_height * scale_factor, init_width * scale_factor))
+
+            if mode == 'patch':
+                intermediate_img = img_utils.make_patches(intermediate_img, scale_factor, patch_size, upscale=False)
+            else:
+                img_height, img_width = self.__match_denoise_size(denoise_models, img_height, img_width, init_height,
+                                                                  init_width, scale_factor)
+
+                intermediate_img = imresize(true_img, (img_height, img_width))
+                intermediate_img = np.expand_dims(intermediate_img, axis=0)
+
+            intermediate_img = intermediate_img.transpose((0, 3, 1, 2)).astype('float64') / 255
+
+            eval_model = self.create_model(img_height, img_width, load_weights=True)
 
             # Evaluating the initial image patches, which gets transformed to the output image, to the input image
-            error = eval_model.evaluate(eval_img, eval_img, batch_size=128)
+            error = eval_model.evaluate(img_conv, intermediate_img, batch_size=128)
             print("\nMean Squared Error of %s  : " % (self.model_name), error[0])
             print("Peak Signal to Noise Ratio of %s : " % (self.model_name), error[1])
+
+    def __match_denoise_size(self, denoise_models, img_height, img_width, init_height, init_width, scale_factor):
+        if self.model_name in denoise_models:
+            if ((init_height * scale_factor) % 4 != 0) or ((init_width * scale_factor) % 4 != 0):
+                print("Deep Denoise requires image size which is multiple of 4.")
+
+                img_height = ((init_height * scale_factor) // 4) * 4
+                img_width = ((init_width * scale_factor) // 4) * 4
+            else:
+                img_height, img_width = init_height, init_width
+        return img_height, img_width
+
 
 class ImageSuperResolutionModel(LearningModel):
 
