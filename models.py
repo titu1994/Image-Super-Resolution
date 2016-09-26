@@ -4,7 +4,7 @@ from keras.layers.convolutional import Convolution2D
 from advanced import HistoryCheckpoint
 import keras.callbacks as callbacks
 import numpy as np
-import keras.backend as K
+from keras import backend as K
 import img_utils
 
 path_X = r"output_images_X\\"
@@ -140,7 +140,10 @@ class LearningModel(object):
             imsave(fn, intermediate_img)
 
         # Transpose and Process images
-        img_conv = images.transpose((0, 3, 1, 2)).astype('float64') / 255
+        if K.image_dim_ordering() == "th":
+            img_conv = images.transpose((0, 3, 1, 2)).astype(np.float32) / 255.
+        else:
+            img_conv = images.astype(np.float32) / 255.
 
         model = self.create_model(img_height, img_width, load_weights=True)
         if verbose: print("Model loaded.")
@@ -151,7 +154,10 @@ class LearningModel(object):
         if verbose: print("De-processing images.")
 
          # Deprocess patches
-        result = result.transpose((0, 2, 3, 1)).astype('float64') * 255
+        if K.image_dim_ordering() == "th":
+            result = result.transpose((0, 2, 3, 1)).astype(np.float32) * 255.
+        else:
+            result = result.astype(np.float32) * 255.
 
         # Output shape is (original_height * scale, original_width * scale, nb_channels)
         if mode == 'patch':
@@ -161,7 +167,6 @@ class LearningModel(object):
             result = result[0, :, :, :] # Access the 3 Dimensional image vector
 
         result = np.clip(result, 0, 255).astype('uint8')
-        result = imfilter(result, 'smooth_more')
 
         if verbose: print("\nCompleted De-processing image.")
 
@@ -187,7 +192,10 @@ class LearningModel(object):
                 intermediate_img = imresize(true_img, (img_height, img_width))
                 intermediate_img = np.expand_dims(intermediate_img, axis=0)
 
-            intermediate_img = intermediate_img.transpose((0, 3, 1, 2)).astype('float64') / 255
+            if K.image_dim_ordering() == "th":
+                intermediate_img = intermediate_img.transpose((0, 3, 1, 2)).astype(np.float32) / 255.
+            else:
+                intermediate_img = intermediate_img.astype(np.float32) / 255.
 
             eval_model = self.create_model(img_height, img_width, load_weights=True)
 
@@ -221,7 +229,12 @@ class ImageSuperResolutionModel(LearningModel):
         """
             Creates a model to be used to scale images of specific height and width.
         """
-        init = Input(shape=(channels, height, width))
+        if K.image_dim_ordering() == "th":
+            shape = (channels, height, width)
+        else:
+            shape = (height, width, channels)
+
+        init = Input(shape=shape)
 
         x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
         x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
@@ -254,8 +267,12 @@ class ExpantionSuperResolution(LearningModel):
         """
             Creates a model to be used to scale images of specific height and width.
         """
+        if K.image_dim_ordering() == "th":
+            shape = (channels, height, width)
+        else:
+            shape = (height, width, channels)
 
-        init = Input(shape=(channels, height, width))
+        init = Input(shape=shape)
 
         x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
 
@@ -290,7 +307,12 @@ class DenoisingAutoEncoderSR(LearningModel):
         from keras.layers.convolutional import Deconvolution2D
         from keras.layers import merge
 
-        init = Input(shape=(channels, height, width))
+        if K.image_dim_ordering() == "th":
+            shape = (channels, height, width)
+        else:
+            shape = (height, width, channels)
+
+        init = Input(shape=shape)
 
         level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
         level2_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_1)
@@ -334,7 +356,12 @@ class DeepDenoiseSR(LearningModel):
         from keras.layers.convolutional import MaxPooling2D, UpSampling2D
         from keras.layers import merge
 
-        init = Input(shape=(channels, height, width))
+        if K.image_dim_ordering() == "th":
+            shape = (channels, height, width)
+        else:
+            shape = (height, width, channels)
+
+        init = Input(shape=shape)
 
         c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
         c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(c1)

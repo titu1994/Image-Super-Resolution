@@ -5,6 +5,8 @@ from sklearn.feature_extraction.image import reconstruct_from_patches_2d, extrac
 from scipy.ndimage.filters import gaussian_filter
 import os
 
+from keras import backend as K
+
 scaling_factor = 3
 fsub = 33
 nb_imgs = 400
@@ -34,18 +36,33 @@ def loadImages(from_file=True):
             print('Could not load numpy array from file. Loading from images...')
 
     # Hold the images
-    dataX = np.zeros((nb_images, 3, fsub, fsub))
-    dataY = np.zeros((nb_images, 3, fsub, fsub))
+    if K.image_dim_ordering() == "th":
+        shape = (nb_images, 3, fsub, fsub)
+    else:
+        shape = (nb_images, fsub, fsub, 3)
+
+    dataX = np.zeros(shape)
+    dataY = np.zeros(shape)
 
     for i, file in enumerate(os.listdir(output_path_Y)):
         # Training images are blurred versions ('Y' according to paper)
         y = imread(output_path_Y + file, mode="RGB")
-        y = y.transpose((2, 0, 1)).astype('float64') / 255
+
+        if K.image_dim_ordering() == "th":
+            y = y.transpose((2, 0, 1)).astype(np.float32) / 255
+        else:
+            y = y.astype(np.float32) / 255
+
         dataX[i, :, :, :] = y
 
         # Non blurred images ('X' according to paper)
         x = imread(output_path_X + file, mode="RGB")
-        x = x.transpose((2, 0, 1)).astype('float64') / 255
+
+        if K.image_dim_ordering() == "th":
+            x = x.transpose((2, 0, 1)).astype(np.float32) / 255
+        else:
+            x = x.astype(np.float32) / 255
+
         dataY[i, :, :, :] = x
 
         if i % 1000 == 0  : print('%0.2f percent images loaded.' % (i * 100 / nb_images))
@@ -72,20 +89,35 @@ def loadDenoiseImages(from_file=True):
             print('Could not load numpy array from file. Loading from images...')
 
     # Hold the images
-    dataX = np.zeros((nb_images, 3, fsub-1, fsub-1))
-    dataY = np.zeros((nb_images, 3, fsub-1, fsub-1))
+    if K.image_dim_ordering() == "th":
+        shape = (nb_images, 3, fsub-1, fsub-1)
+    else:
+        shape = (nb_images, fsub-1, fsub-1, 3)
+
+    dataX = np.zeros(shape)
+    dataY = np.zeros(shape)
 
     for i, file in enumerate(os.listdir(output_path_Y)):
         # Training images are blurred versions ('Y' according to paper)
         y = imread(output_path_Y + file, mode="RGB")
         y = imresize(y, (fsub-1, fsub-1))
-        y = y.transpose((2, 0, 1)).astype('float64') / 255
+
+        if K.image_dim_ordering() == "th":
+            y = y.transpose((2, 0, 1)).astype(np.float32) / 255
+        else:
+            y = y.astype(np.float32) / 255
+
         dataX[i, :, :, :] = y
 
         # Non blurred images ('X' according to paper)
         x = imread(output_path_X + file, mode="RGB")
         x = imresize(x, (fsub-1, fsub-1))
-        x = x.transpose((2, 0, 1)).astype('float64') / 255
+
+        if K.image_dim_ordering() == "th":
+            x = x.transpose((2, 0, 1)).astype(np.float32) / 255
+        else:
+            x = x.astype(np.float32) / 255
+
         dataY[i, :, :, :] = x
 
         if i % 1000 == 0  : print('%0.2f percent images loaded.' % (i * 100 / nb_images))
@@ -159,7 +191,7 @@ def split_image(img, scaling_factor):
 
     for i in range(0, scaling_factor):
         for j in range(0, scaling_factor):
-            shards[shard_index, :, :, :] = img[i*shard_height:(i+1)*shard_height,
+            shards[shard_index, :, :, :] = img[i*shard_height: (i+1)*shard_height,
                                                j*shard_width: (j+1)*shard_width, :]
             shard_index += 1
 
@@ -180,7 +212,7 @@ def merge_images(imgs, scaling_factor):
 
     for i in range(0, scaling_factor):
         for j in range(0, scaling_factor):
-            img[i*height:(i+1)*height, j*width: (j+1)*width, :] = imgs[img_index, :, :, :]
+            img[i * height : (i+1) * height, j * width : (j+1) * width, :] = imgs[img_index, :, :, :]
             img_index += 1
 
     return img
