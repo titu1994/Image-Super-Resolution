@@ -101,11 +101,10 @@ class LearningModel(object):
         # Read image
         scale_factor = int(scale_factor)
         true_img = imread(img_path, mode='RGB')
-        init_height, init_width = true_img.shape[0], true_img.shape[1]
+        init_width, init_height = true_img.shape[0], true_img.shape[1]
         if verbose: print("Old Size : ", true_img.shape)
         if verbose: print("New Size : (%d, %d, 3)" % (init_height * scale_factor, init_width * scale_factor))
 
-        images = None
         img_height, img_width = 0, 0
 
         denoise_models = ['Deep Denoise SR']
@@ -120,14 +119,14 @@ class LearningModel(object):
             images = img_utils.make_patches(true_img, scale_factor, patch_size, verbose)
 
             nb_images = images.shape[0]
-            img_height, img_width = images.shape[1], images.shape[2]
+            img_width, img_height = images.shape[1], images.shape[2]
             print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_images, img_height, img_width))
         else:
             # Use full image for super resolution
-            img_height, img_width = self.__match_denoise_size(denoise_models, img_height, img_width, init_height,
+            img_width, img_height = self.__match_denoise_size(denoise_models, img_height, img_width, init_height,
                                                               init_width, scale_factor)
 
-            images = imresize(true_img, (img_height, img_width))
+            images = imresize(true_img, (img_width, img_height))
             images = np.expand_dims(images, axis=0)
             print("Image is reshaped to : (%d, %d, %d)" % (images.shape[1], images.shape[2], images.shape[3]))
 
@@ -136,7 +135,7 @@ class LearningModel(object):
         if save_intermediate:
             if verbose: print("Saving intermediate image.")
             fn = path[0] + "_intermediate_" + path[1]
-            intermediate_img = imresize(true_img, (init_height * scale_factor, init_width * scale_factor))
+            intermediate_img = imresize(true_img, (init_width * scale_factor, init_height * scale_factor))
             imsave(fn, intermediate_img)
 
         # Transpose and Process images
@@ -159,9 +158,9 @@ class LearningModel(object):
         else:
             result = result.astype(np.float32) * 255.
 
-        # Output shape is (original_height * scale, original_width * scale, nb_channels)
+        # Output shape is (original_width * scale, original_height * scale, nb_channels)
         if mode == 'patch':
-            out_shape = (init_height * scale_factor, init_width * scale_factor, 3)
+            out_shape = (init_width * scale_factor, init_height * scale_factor, 3)
             result = img_utils.combine_patches(result, out_shape, scale_factor)
         else:
             result = result[0, :, :, :] # Access the 3 Dimensional image vector
@@ -181,15 +180,15 @@ class LearningModel(object):
             if verbose: print("Evaluating results.")
             # Convert initial image into correct format
             if intermediate_img is None:
-                intermediate_img = imresize(true_img, (init_height * scale_factor, init_width * scale_factor))
+                intermediate_img = imresize(true_img, (init_width * scale_factor, init_height * scale_factor))
 
             if mode == 'patch':
                 intermediate_img = img_utils.make_patches(intermediate_img, scale_factor, patch_size, upscale=False)
             else:
-                img_height, img_width = self.__match_denoise_size(denoise_models, img_height, img_width, init_height,
+                img_width, img_height = self.__match_denoise_size(denoise_models, img_height, img_width, init_height,
                                                                   init_width, scale_factor)
 
-                intermediate_img = imresize(true_img, (img_height, img_width))
+                intermediate_img = imresize(true_img, (img_width, img_height))
                 intermediate_img = np.expand_dims(intermediate_img, axis=0)
 
             if K.image_dim_ordering() == "th":
@@ -230,9 +229,9 @@ class ImageSuperResolutionModel(LearningModel):
             Creates a model to be used to scale images of specific height and width.
         """
         if K.image_dim_ordering() == "th":
-            shape = (channels, height, width)
+            shape = (channels, width, height)
         else:
-            shape = (height, width, channels)
+            shape = (width, height, channels)
 
         init = Input(shape=shape)
 
@@ -268,9 +267,9 @@ class ExpantionSuperResolution(LearningModel):
             Creates a model to be used to scale images of specific height and width.
         """
         if K.image_dim_ordering() == "th":
-            shape = (channels, height, width)
+            shape = (channels, width, height)
         else:
-            shape = (height, width, channels)
+            shape = (width, height, channels)
 
         init = Input(shape=shape)
 
@@ -308,9 +307,9 @@ class DenoisingAutoEncoderSR(LearningModel):
         from keras.layers import merge
 
         if K.image_dim_ordering() == "th":
-            shape = (channels, height, width)
+            shape = (channels, width, height)
         else:
-            shape = (height, width, channels)
+            shape = (width, height, channels)
 
         init = Input(shape=shape)
 
@@ -357,9 +356,9 @@ class DeepDenoiseSR(LearningModel):
         from keras.layers import merge
 
         if K.image_dim_ordering() == "th":
-            shape = (channels, height, width)
+            shape = (channels, width, height)
         else:
-            shape = (height, width, channels)
+            shape = (width, height, channels)
 
         init = Input(shape=shape)
 
