@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from scipy.misc import imsave, imread, imresize
@@ -8,6 +10,11 @@ import os
 import time
 
 img_size = 256
+stride = 8
+
+assert (img_size ** 2) % (stride ** 2) == 0, "Number of images generated from strided subsample of the image needs to be \n" \
+                                             "a positive integer. Change stride such that : \n" \
+                                             "(img_size ** 2) / (stride ** 2) is a positive integer."
 
 input_path = r"input_images/"
 validation_path = r"val_images/"
@@ -47,7 +54,6 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
         img = imresize(img, (img_size, img_size))
 
         # Create patches
-        stride = 16
         hr_patch_size = (16 * scaling_factor)
         nb_hr_images = (img_size ** 2) // (stride ** 2)
 

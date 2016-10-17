@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 from keras.utils.visualize_util import plot
 import models
 import img_utils
@@ -55,9 +57,9 @@ if __name__ == "__main__":
     Train Deep Denoise SR
     """
 
-    #ddsr = models.DeepDenoiseSR()
-    #ddsr.create_model()
-    #ddsr.fit(scale_factor=scale, nb_epochs=60)
+    ddsr = models.DeepDenoiseSR(scale)
+    ddsr.create_model(load_weights=True)
+    ddsr.fit(nb_epochs=100)
 
     """
     Train Res Net SR
@@ -87,15 +89,15 @@ if __name__ == "__main__":
     This causes the model to fail to predict different images of different image sizes.
     """
 
-    dsr = models.DenoisingAutoEncoderSR(scale)
-    dsr.evaluate(val_path)
+    #dsr = models.DenoisingAutoEncoderSR(scale)
+    #dsr.evaluate(val_path)
 
     """
     Evaluate DDSRCNN on Set5
     """
 
-    #ddsr = models.DeepDenoiseSR()
-    #ddsr.evaluate(val_path, scale_factor=scale)
+    ddsr = models.DeepDenoiseSR(scale)
+    ddsr.evaluate(val_path)
 
     """
     Compare output images of sr, esr, dsr and ddsr models

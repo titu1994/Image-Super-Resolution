@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 from keras.models import Model
 from keras.layers import Input, merge, BatchNormalization, Activation
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D
@@ -99,6 +101,7 @@ class BaseSuperResolutionModel(object):
         """
         Evaluates the model on the Set5 Validation images
         """
+        print("Validating %s model" % self.model_name)
         if self.model == None: self.create_model(load_weights=True, small_train_images=small_train_images)
 
         if self.evaluation_func is None:
