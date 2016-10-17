@@ -36,7 +36,7 @@ Now:
 
 Below, 'True' upscaling models refer to those models who take a (width X height) image and internally upscale this image such that output is of size (width * scale X height * scale). Examples : Efficient Sub-Pixel CNN (ESPCNN) / SRGAN
 
-'General' upscaling models reger to those models to take a (width X height) image, perform pooling and subsequent upsampling to provide an output that is of size (width X height), which is sharper and clearer than blurred input.
+'General' upscaling models refer to those models which take a (width X height) image, perform pooling and subsequent upsampling to provide an output that is of size (width X height), which is sharper and clearer than blurred input.
 
 Previously:
 - LearningModel was the base class for all other SR models.
