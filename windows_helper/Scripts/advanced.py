@@ -1,4 +1,6 @@
 from keras.callbacks import Callback
+from keras.regularizers import ActivityRegularizer
+from keras import backend as K
 
 class HistoryCheckpoint(Callback):
     '''Callback that records events
@@ -38,3 +40,31 @@ class HistoryCheckpoint(Callback):
 
         with open(self.filename, "w") as f:
             f.write(str(self.history))
+
+class TVRegularizer(ActivityRegularizer):
+    """ Enforces smoothness in image output. """
+
+    def __init__(self, img_width, img_height, weight=2e-8):
+        super(TVRegularizer, self).__init__()
+        self.img_width = img_width
+        self.img_height = img_height
+        self.weight = weight
+        self.uses_learning_phase = False
+
+    def __call__(self, loss):
+        x = self.layer.output
+        assert K.ndim(x) == 4
+        if K.image_dim_ordering() == 'th':
+            a = K.square(x[:, :, :self.img_width - 1, :self.img_height - 1] - x[:, :, 1:, :self.img_height - 1])
+            b = K.square(x[:, :, :self.img_width - 1, :self.img_height - 1] - x[:, :, :self.img_width - 1, 1:])
+        else:
+            a = K.square(x[:, :self.img_width - 1, :self.img_height - 1, :] - x[:, 1:, :self.img_height - 1, :])
+            b = K.square(x[:, :self.img_width - 1, :self.img_height - 1, :] - x[:, :self.img_width - 1, 1:, :])
+        loss += self.weight * K.mean(K.sum(K.pow(a + b, 1.25)))
+        return loss
+
+    def get_config(self):
+        return {'name' : self.__class__.__name__,
+                'img_width' : self.img_width,
+                'img_height' : self.img_height,
+                'weight' : self.weight}

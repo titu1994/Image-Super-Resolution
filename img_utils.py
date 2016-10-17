@@ -1,221 +1,113 @@
 import numpy as np
-from sklearn.feature_extraction import image
+from numpy.lib.stride_tricks import as_strided
 from scipy.misc import imsave, imread, imresize
 from sklearn.feature_extraction.image import reconstruct_from_patches_2d, extract_patches_2d
 from scipy.ndimage.filters import gaussian_filter
+
 import os
+import time
 
-from keras import backend as K
+img_size = 256
 
-scaling_factor = 3
-fsub = 33
-nb_imgs = 400
+input_path = r"input_images/"
+validation_path = r"val_images/"
 
-input_path = r"input_images\\"
-output_path_X = r"output_images_X\\"
-output_path_Y = r"output_images_Y\\"
+output_path = r"train_images/train/"
+validation_output_path = r"train_images/validation/"
 
-if not os.path.exists(output_path_X):
-    os.makedirs(output_path_X)
+if not os.path.exists(output_path):
+    os.makedirs(output_path)
 
-if not os.path.exists(output_path_Y):
-    os.makedirs(output_path_Y)
-
-def loadImages(from_file=True):
-    # Compute number of images
-    nb_images = len([name for name in os.listdir(output_path_X)])
-    print("Loading %d images." % (nb_images))
-
-    if from_file:
-        try:
-            dataX = np.load(r'arrays\DATA_X.npy')
-            dataY = np.load(r'arrays\DATA_Y.npy')
-            print('Loaded images from file.')
-            return (dataX, dataY)
-        except:
-            print('Could not load numpy array from file. Loading from images...')
-
-    # Hold the images
-    if K.image_dim_ordering() == "th":
-        shape = (nb_images, 3, fsub, fsub)
-    else:
-        shape = (nb_images, fsub, fsub, 3)
-
-    dataX = np.zeros(shape)
-    dataY = np.zeros(shape)
-
-    for i, file in enumerate(os.listdir(output_path_Y)):
-        # Training images are blurred versions ('Y' according to paper)
-        y = imread(output_path_Y + file, mode="RGB")
-
-        if K.image_dim_ordering() == "th":
-            y = y.transpose((2, 0, 1)).astype(np.float32) / 255
-        else:
-            y = y.astype(np.float32) / 255
-
-        dataX[i, :, :, :] = y
-
-        # Non blurred images ('X' according to paper)
-        x = imread(output_path_X + file, mode="RGB")
-
-        if K.image_dim_ordering() == "th":
-            x = x.transpose((2, 0, 1)).astype(np.float32) / 255
-        else:
-            x = x.astype(np.float32) / 255
-
-        dataY[i, :, :, :] = x
-
-        if i % 1000 == 0  : print('%0.2f percent images loaded.' % (i * 100 / nb_images))
-
-    if not os.path.exists(r'arrays\DATA_X.npy') or not os.path.exists(r'arrays\DATA_Y.npy'):
-        if not os.path.exists(r'arrays\\'): os.makedirs(r'arrays\\')
-        np.save(r'arrays\DATA_X.npy', dataX)
-        np.save(r'arrays\DATA_Y.npy', dataY)
-
-    return (dataX, dataY)
-
-def loadDenoiseImages(from_file=True):
-    # Compute number of images
-    nb_images = len([name for name in os.listdir(output_path_X)])
-    print("Loading %d images." % (nb_images))
-
-    if from_file:
-        try:
-            dataX = np.load(r'arrays\DENOISE_DATA_X.npy')
-            dataY = np.load(r'arrays\DENOISE_DATA_Y.npy')
-            print('Loaded images from file.')
-            return (dataX, dataY)
-        except:
-            print('Could not load numpy array from file. Loading from images...')
-
-    # Hold the images
-    if K.image_dim_ordering() == "th":
-        shape = (nb_images, 3, fsub-1, fsub-1)
-    else:
-        shape = (nb_images, fsub-1, fsub-1, 3)
-
-    dataX = np.zeros(shape)
-    dataY = np.zeros(shape)
-
-    for i, file in enumerate(os.listdir(output_path_Y)):
-        # Training images are blurred versions ('Y' according to paper)
-        y = imread(output_path_Y + file, mode="RGB")
-        y = imresize(y, (fsub-1, fsub-1))
-
-        if K.image_dim_ordering() == "th":
-            y = y.transpose((2, 0, 1)).astype(np.float32) / 255
-        else:
-            y = y.astype(np.float32) / 255
-
-        dataX[i, :, :, :] = y
-
-        # Non blurred images ('X' according to paper)
-        x = imread(output_path_X + file, mode="RGB")
-        x = imresize(x, (fsub-1, fsub-1))
-
-        if K.image_dim_ordering() == "th":
-            x = x.transpose((2, 0, 1)).astype(np.float32) / 255
-        else:
-            x = x.astype(np.float32) / 255
-
-        dataY[i, :, :, :] = x
-
-        if i % 1000 == 0  : print('%0.2f percent images loaded.' % (i * 100 / nb_images))
-
-    if not os.path.exists(r'arrays\DENOISE_DATA_X.npy' or not os.path.exists(r'arrays\DENOISE_DATA_Y.npy')):
-        if not os.path.exists(r'arrays\\'): os.makedirs(r'arrays\\')
-        np.save(r'arrays\DENOISE_DATA_X.npy', dataX)
-        np.save(r'arrays\DENOISE_DATA_Y.npy', dataY)
-
-    return (dataX, dataY)
-
-def transform_images(directory):
-    import os
-    import time
+def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1):
     index = 1
+
+    assert scaling_factor % 2 == 0, "Scaling factor must be multiple of 2"
+
+    if not os.path.exists(output_directory + "/X/"):
+        os.makedirs(output_directory + "/X/")
+
+    if not os.path.exists(output_directory + "/y/"):
+        os.makedirs(output_directory + "/y/")
 
     # For each image in input_images directory
     nb_images = len([name for name in os.listdir(directory)])
     print("Transforming %d images." % (nb_images))
 
-    for file in os.listdir(directory):
-        img = imread(input_path + file, mode='RGB')
+    if nb_images == 0:
+        print("Extract the training images or images from imageset_91.zip (found in the releases of the project) "
+              "into a directory with the name 'input_images'")
+        print("Extract the validation images or images from set5_validation.zip (found in the releases of the project) "
+              "into a directory with the name 'val_images'")
+        exit()
 
-        # Resize to 400 x 400
-        img = imresize(img, (nb_imgs, nb_imgs))
+    for file in os.listdir(directory):
+        img = imread(directory + file, mode='RGB')
+
+        # Resize to 256 x 256
+        img = imresize(img, (img_size, img_size))
 
         # Create patches
-        patches = image.extract_patches_2d(img, (fsub, fsub), max_patches=nb_imgs)
+        stride = 16
+        hr_patch_size = (16 * scaling_factor)
+        nb_hr_images = (img_size ** 2) // (stride ** 2)
+
+        hr_samples = np.empty((nb_hr_images, hr_patch_size, hr_patch_size, 3))
+
+        image_subsample_iterator = subimage_generator(img, stride, hr_patch_size, nb_hr_images)
+
+        i = 0
+        for j in range(stride):
+            for k in range(stride):
+                hr_samples[i, :, :, :] = next(image_subsample_iterator)
+                i += 1
+
+        lr_patch_size = 16
 
         t1 = time.time()
-        # Create 400 'X' and 'Y' sub-images of size 33 x 33 for each patch
-        for i in range(nb_imgs):
-            ip = patches[i]
+        # Create nb_hr_images 'X' and 'Y' sub-images of size hr_patch_size for each patch
+        for i in range(nb_hr_images):
+            ip = hr_samples[i]
             # Save ground truth image X
-            imsave(output_path_X + "%d_%d.png" % (index, i+1), ip)
+            imsave(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
 
             # Apply Gaussian Blur to Y
-            op = gaussian_filter(ip, sigma=0.5)
+            op = gaussian_filter(ip, sigma=0.01)
 
-            # Subsample by scaling factor 3 to Y
-            op = imresize(op, (fsub // scaling_factor, fsub // scaling_factor))
+            # Subsample by scaling factor to Y
+            op = imresize(op, (lr_patch_size, lr_patch_size), interp='bicubic')
 
-            # Upscale by scaling factor 3 to Y
-            op = imresize(op, (fsub, fsub), interp='bicubic')
+            # Upscale by scaling factor to Y
+            op = imresize(op, (hr_patch_size, hr_patch_size), interp='bicubic')
 
             # Save Y
-            imsave(output_path_Y + "%d_%d.png" % (index, i+1), op)
+            imsave(output_directory + "/X/" + "%d_%d.png" % (index, i+1), op)
 
         print("Finished image %d in time %0.2f seconds. (%s)" % (index, time.time() - t1, file))
         index += 1
 
+        if max_nb_images > 0 and index >= max_nb_images:
+            print("Transformed maximum number of images. ")
+            break
+
     print("Images finished.")
 
-def split_image(img, scaling_factor):
-    """
-    Splits image in (scale_factor x scale_factor) partitions, therefore allowing smaller images of size
-    (height / scale_factor, width_scale_factor) to be loaded into gpu for scaling
 
-    :param img: Image of shape (height, width, channels)
-    :return: Sharded image of shape (s*s, height, width, channels) where s is scale_factor
-    """
-    height, width = img.shape[0], img.shape[1]
+def image_count():
+    return len([name for name in os.listdir(output_path + "/X/")])
 
-    shard_height = height // scaling_factor
-    shard_width = width // scaling_factor
-    nb_shards = scaling_factor * scaling_factor
 
-    # Holder for image shards
-    shards = np.empty((nb_shards, shard_width, shard_height, 3))
-    shard_index = 0
+def val_image_count():
+    return len([name for name in os.listdir(validation_output_path + "/X/")])
 
-    for i in range(0, scaling_factor):
-        for j in range(0, scaling_factor):
-            shards[shard_index, :, :, :] = img[j*shard_width: (j+1)*shard_width,
-                                               i*shard_height: (i+1)*shard_height, :]
-            shard_index += 1
 
-    return shards
+def subimage_generator(img, stride, patch_size, nb_hr_images):
+    for _ in range(nb_hr_images):
+        for x in range(0, img_size - patch_size, stride):
+            for y in range(0, img_size - patch_size, stride):
+                subimage = img[x : x + patch_size, y : y + patch_size, :]
 
-def merge_images(imgs, scaling_factor):
-    """
-    Merges the shards of the image into a new image of shape (true_height, true_width, 3)
+                yield subimage
 
-    :return: Merged image of shape (true_height, true_width, 3)
-    """
-    height, width = imgs.shape[1], imgs.shape[2]
-    true_height, true_width = height * scaling_factor, width * scaling_factor
-
-    # Holder for image
-    img = np.empty((true_width, true_height, 3))
-    img_index = 0
-
-    for i in range(0, scaling_factor):
-        for j in range(0, scaling_factor):
-            img[j * width : (j+1) * width, i * height : (i+1) * height, :] = imgs[img_index, :, :, :]
-            img_index += 1
-
-    return img
 
 def make_patches(x, scale, patch_size, upscale=True, verbose=1):
     '''x shape: (num_channels, rows, cols)'''
@@ -230,7 +122,75 @@ def combine_patches(in_patches, out_shape, scale):
     recon = reconstruct_from_patches_2d(in_patches, out_shape)
     return recon
 
+def block_view(A, block):
+    shape= (A.shape[0] / block[0], A.shape[1] / block[1], A.shape[2] / block[2]) + block
+    strides= (block[0] * A.strides[0], block[1] * A.strides[1], block[2] * A.strides[2])+ A.strides
+    return as_strided(A, shape= shape, strides= strides)
+
+def image_generator(directory, scale_factor=2, small_train_images=False , shuffle=True, batch_size=32, seed=None):
+    image_shape = (3, 16 * scale_factor, 16 * scale_factor)
+
+    file_names = [f for f in sorted(os.listdir(directory + "X/"))]
+    X_filenames = [os.path.join(directory, "X", f) for f in file_names]
+    y_filenames = [os.path.join(directory, "y", f) for f in file_names]
+
+    nb_images = len(file_names)
+    print("Found %d images." % nb_images)
+
+    index_generator = _index_generator(nb_images, batch_size, shuffle, seed)
+
+    while 1:
+        index_array, current_index, current_batch_size = next(index_generator)
+
+        batch_x = np.zeros((current_batch_size,) + image_shape)
+        batch_y = np.zeros((current_batch_size,) + image_shape)
+
+        for i, j in enumerate(index_array):
+            x_fn = X_filenames[j]
+            img = imread(x_fn, mode='RGB')
+            if small_train_images:
+                img = imresize(img, (16, 16))
+            img = img.astype('float32') / 255.
+            batch_x[i] = img.transpose((2, 0, 1))
+
+            y_fn = y_filenames[j]
+            img = imread(y_fn, mode="RGB")
+            img = img.astype('float32') / 255.
+            batch_y[i] = img.transpose((2, 0, 1))
+
+        yield (batch_x, batch_y)
+
+def _index_generator(N, batch_size=32, shuffle=True, seed=None):
+    batch_index = 0
+    total_batches_seen = 0
+
+    while 1:
+        if seed is not None:
+            np.random.seed(seed + total_batches_seen)
+
+        if batch_index == 0:
+            index_array = np.arange(N)
+            if shuffle:
+                index_array = np.random.permutation(N)
+
+        current_index = (batch_index * batch_size) % N
+
+        if N >= current_index + batch_size:
+            current_batch_size = batch_size
+            batch_index += 1
+        else:
+            current_batch_size = N - current_index
+            batch_index = 0
+        total_batches_seen += 1
+
+        yield (index_array[current_index: current_index + current_batch_size],
+               current_index, current_batch_size)
+
+
 if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images
-    #transform_images(input_path)
+    scaling_factor = 2
+
+    transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1)
+    transform_images(validation_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
     pass
