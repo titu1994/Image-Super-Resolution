@@ -47,9 +47,9 @@ if __name__ == "__main__":
     Train DenoisingAutoEncoderSR
     """
 
-    dsr = models.DenoisingAutoEncoderSR(scale)
-    dsr.create_model()
-    dsr.fit(nb_epochs=250)
+    # dsr = models.DenoisingAutoEncoderSR(scale)
+    # dsr.create_model()
+    # dsr.fit(nb_epochs=250)
 
     """
     Train Deep Denoise SR

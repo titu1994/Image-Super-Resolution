@@ -419,18 +419,20 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
 
         if K.image_dim_ordering() == "th":
             shape = (channels, width, height)
+            output_shape = (None, channels, width, height)
         else:
             shape = (width, height, channels)
+            output_shape = (None, width, height, channels)
 
         init = Input(shape=shape)
 
         level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
         level2_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_1)
 
-        level2_2 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(level2_1)
+        level2_2 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=output_shape, border_mode='same')(level2_1)
         level2 = merge([level2_1, level2_2], mode='sum')
 
-        level1_2 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=(None, channels, height, width), border_mode='same')(level2)
+        level1_2 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=output_shape, border_mode='same')(level2)
         level1 = merge([level1_1, level1_2], mode='sum')
 
         decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(level1)
@@ -482,7 +484,7 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
                 x = x.transpose((0, 3, 1, 2))
                 y = y.transpose((0, 3, 1, 2))
 
-            self.model = self.create_model(height, width)
+            self.model = self.create_model(height, width, load_weights=True)
 
             self.evaluation_func = K.function([self.model.layers[0].input],
                                               [self.model.layers[-1].output])
