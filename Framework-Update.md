@@ -80,7 +80,7 @@ Due to the above changes, it is recommended to :
 - Deep Denoise SR model (DDSR model)
 
 ## New models which can now be trained 
-- Residual Network SR [ResNetSR model] (RNSR)
+- Residual Network SR (ResNetSR model) (RNSR)
 - Efficient Sub-Pixel Convolutional Neural Network model (ESPCNN) [Once Sub-Pixel Convolution is added to Keras]
 
 
