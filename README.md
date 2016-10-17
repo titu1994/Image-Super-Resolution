@@ -15,10 +15,13 @@ pip install git+https://github.com/Theano/Theano.git --upgrade --no-deps
 ```
 
 ## Usage
+
+**Note**: The project is going to be reworked. Therefore please refer to [Framework-Updates.md](https://github.com/titu1994/Image-Super-Resolution/blob/master/Framework-Update.md) to see the changes which will affect performance.
+
 The model weights are already provided in the weights folder, therefore simply running :<br>
 `python main.py "imgpath"`, where imgpath is a full path to the image.
 
-The default model is DSRCNN (dsr), which outperforms the other three models. To switch models,<br>
+The default model is DDSRCNN (dsr), which outperforms the other three models. To switch models,<br>
 `python main.py "imgpath" --model="type"`, where type = `sr`, `esr`, `dsr`, `ddsr`
 
 If the scaling factor needs to be altered then :<br>
@@ -45,7 +48,7 @@ The model above is the simplest model of the ones described in the paper above, 
 Larger architectures can be easily made, but come at the cost of execution time, especially on CPU.
 
 However there are some differences from the original paper:
-<br><b>[1]</b> Used the AdaDelta optimizer instead of RMSProp.
+<br><b>[1]</b> Used the Adam optimizer instead of RMSProp.
 <br><b>[2]</b> This model contains some 21,000 parameters, more than the 8,400 of the original paper.
 
 It is to be noted that the original models underperform compared to the results posted in the paper. This may be due to the only 91 images being the training set compared to the entire ILSVR 2013 image set. It still performs well, however images are slightly noisy.
