@@ -21,11 +21,11 @@ Previously:
 - It used stride=1 patching mechanism to get sub-images, which was highly inefficient.
 
 Now:
-- It creates rougly 24k images (almost same as the original paper)
+- It creates rougly 94k images
 - It uses generators to load batch_size number of images, determined by the batch_index_generator. 
 - It can handle any number of training images.
 - It wont run out of memory due to loading only a subset of images
-- It uses stride=16 and generates images of size 32x32
+- It uses stride=8 and generates images of size 32x32
 - It can create 256 sub images out of each image provided, therefore larger image datasets like ImageNet and MS COCO can be used to create image training sets.
 
 ## Advanced.py
