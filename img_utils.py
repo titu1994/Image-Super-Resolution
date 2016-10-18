@@ -10,7 +10,7 @@ import os
 import time
 
 img_size = 256
-stride = 8
+stride = 16
 
 assert (img_size ** 2) % (stride ** 2) == 0, "Number of images generated from strided subsample of the image needs to be \n" \
                                              "a positive integer. Change stride such that : \n" \
@@ -27,8 +27,6 @@ if not os.path.exists(output_path):
 
 def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1):
     index = 1
-
-    assert scaling_factor % 2 == 0, "Scaling factor must be multiple of 2"
 
     if not os.path.exists(output_directory + "/X/"):
         os.makedirs(output_directory + "/X/")
@@ -61,9 +59,11 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
 
         image_subsample_iterator = subimage_generator(img, stride, hr_patch_size, nb_hr_images)
 
+        stride_range = np.sqrt(nb_hr_images).astype(int)
+
         i = 0
-        for j in range(stride):
-            for k in range(stride):
+        for j in range(stride_range):
+            for k in range(stride_range):
                 hr_samples[i, :, :, :] = next(image_subsample_iterator)
                 i += 1
 
@@ -77,7 +77,7 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
             imsave(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
 
             # Apply Gaussian Blur to Y
-            op = gaussian_filter(ip, sigma=0.01)
+            op = gaussian_filter(ip, sigma=0.1)
 
             # Subsample by scaling factor to Y
             op = imresize(op, (lr_patch_size, lr_patch_size), interp='bicubic')

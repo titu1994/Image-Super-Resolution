@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     # sr = models.ImageSuperResolutionModel(scale)
     # sr.create_model()
-    # sr.fit(nb_epochs=300)
+    # sr.fit(nb_epochs=250)
 
     """
     Train ExpantionSuperResolution
@@ -58,8 +58,8 @@ if __name__ == "__main__":
     """
 
     ddsr = models.DeepDenoiseSR(scale)
-    ddsr.create_model(load_weights=True)
-    ddsr.fit(nb_epochs=100)
+    ddsr.create_model(load_weights=False)
+    ddsr.fit(nb_epochs=60)
 
     """
     Train Res Net SR
