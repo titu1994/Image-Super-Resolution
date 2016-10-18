@@ -18,12 +18,13 @@ assert (img_size ** 2) % (stride ** 2) == 0, "Number of images generated from st
 
 input_path = r"input_images/"
 validation_path = r"val_images/"
+
 validation_set5_path = validation_path + "set5/"
 validation_set14_path = validation_path + "set14/"
 
 base_dataset_dir = os.path.expanduser("~") + "/Image Super Resolution Dataset/"
-output_path = base_dataset_dir + "train_images/train/"
 
+output_path = base_dataset_dir + "train_images/train/"
 validation_output_path = base_dataset_dir + r"train_images/validation/"
 
 if not os.path.exists(output_path):
@@ -99,7 +100,7 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
             print("Transformed maximum number of images. ")
             break
 
-    print("Images finished.")
+    print("Images transformed. Saved at directory : %s" % (output_directory))
 
 
 def image_count():

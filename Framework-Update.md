@@ -27,6 +27,7 @@ Now:
 - It wont run out of memory due to loading only a subset of images
 - It uses stride=16 and generates images of size 32x32
 - It can create 256 sub images out of each image provided, therefore larger image datasets like ImageNet and MS COCO can be used to create image training sets.
+- It saves them in the Users home path, with a "Image Super Resolution Dataset" sub-directory
 
 ## Advanced.py
 `advanced.py` now contains TVRegularization code, which will be used for ResNetSR models.

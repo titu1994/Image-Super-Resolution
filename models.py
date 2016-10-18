@@ -112,67 +112,75 @@ class BaseSuperResolutionModel(object):
         if not os.path.exists(predict_path):
             os.makedirs(predict_path)
 
-        image_fns = [name for name in os.listdir(validation_dir)]
-        nb_images = len(image_fns)
-        print("Validating %d images" % (nb_images))
+        validation_path_set5 = validation_dir + "set5/"
+        validation_path_set14 = validation_dir + "set14/"
 
-        total_psnr = 0.0
+        validation_dirs = [validation_path_set5, validation_path_set14]
 
-        for impath in os.listdir(validation_dir):
-            t1 = time.time()
+        for val_dir in validation_dirs:
+            image_fns = [name for name in os.listdir(val_dir)]
+            nb_images = len(image_fns)
+            print("Validating %d images from path %s" % (nb_images, val_dir))
 
-            # Input image
-            y = img_utils.imread(validation_dir + impath, mode='RGB')
-            width, height, _ = y.shape
+            total_psnr = 0.0
 
-            if self.model_name in self.auto_encoder_models:
-                # Denoise models require precise width and height, divisible by 4
+            for impath in os.listdir(val_dir):
+                t1 = time.time()
 
-                if ((width // self.scale_factor) % 4 != 0) or ((height // self.scale_factor) % 4 != 0):
-                    width = ((width // self.scale_factor) // 4) * 4 * self.scale_factor
-                    height = ((height // self.scale_factor) // 4) * 4 * self.scale_factor
+                # Input image
+                y = img_utils.imread(val_dir + impath, mode='RGB')
+                width, height, _ = y.shape
 
-                    print("Model %s require the image size to be divisible by 4. New image size = (%d, %d)" % \
-                                                                                (self.model_name, width, height))
+                if self.model_name in self.auto_encoder_models:
+                    # Denoise models require precise width and height, divisible by 4
 
-                    y = img_utils.imresize(y, (width, height), interp='bicubic')
+                    if ((width // self.scale_factor) % 4 != 0) or ((height // self.scale_factor) % 4 != 0)\
+                            or (width % 2 != 0) or (height % 2 != 0):
 
-            y = y.astype('float32') / 255.
-            y = np.expand_dims(y, axis=0)
+                        width = ((width // self.scale_factor) // 4) * 4 * self.scale_factor
+                        height = ((height // self.scale_factor) // 4) * 4 * self.scale_factor
 
-            x_width = width if not small_train_images else width // self.scale_factor
-            x_height = height if not small_train_images else height // self.scale_factor
+                        print("Model %s require the image size to be divisible by 4. New image size = (%d, %d)" % \
+                            (self.model_name, width, height))
 
-            x_temp = y.copy()
-            img = img_utils.gaussian_filter(x_temp[0], sigma=0.01)
-            img = img_utils.imresize(img, (x_width // self.scale_factor, x_height // self.scale_factor), interp='bicubic')
+                        y = img_utils.imresize(y, (width, height), interp='bicubic')
 
-            if not small_train_images:
-                img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
+                y = y.astype('float32') / 255.
+                y = np.expand_dims(y, axis=0)
 
-            x = np.expand_dims(img, axis=0)
+                x_width = width if not small_train_images else width // self.scale_factor
+                x_height = height if not small_train_images else height // self.scale_factor
 
-            if K.image_dim_ordering() == "th":
-                x = x.transpose((0, 3, 1, 2))
-                y = y.transpose((0, 3, 1, 2))
+                x_temp = y.copy()
+                img = img_utils.gaussian_filter(x_temp[0], sigma=0.01)
+                img = img_utils.imresize(img, (x_width // self.scale_factor, x_height // self.scale_factor), interp='bicubic')
 
-            y_pred = self.evaluation_func([x])[0][0]
+                if not small_train_images:
+                    img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
 
-            psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
-            total_psnr += psnr_val
+                x = np.expand_dims(img, axis=0)
 
-            t2 = time.time()
-            print("Validated image : %s, Time required : %0.2f, PSNR value : %0.4f" % (impath, t2 - t1, psnr_val))
+                if K.image_dim_ordering() == "th":
+                    x = x.transpose((0, 3, 1, 2))
+                    y = y.transpose((0, 3, 1, 2))
 
-            generated_path = predict_path + "%s_%s_generated.png" % (self.model_name, os.path.splitext(impath)[0])
+                y_pred = self.evaluation_func([x])[0][0]
 
-            if K.image_dim_ordering() == "th":
-                y_pred = y_pred.transpose((1, 2, 0))
+                psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
+                total_psnr += psnr_val
 
-            y_pred = np.clip(y_pred, 0, 255).astype('uint8')
-            img_utils.imsave(generated_path, y_pred)
+                t2 = time.time()
+                print("Validated image : %s, Time required : %0.2f, PSNR value : %0.4f" % (impath, t2 - t1, psnr_val))
 
-        print("Average PRNS value of validation images = %00.4f" % (total_psnr / nb_images))
+                generated_path = predict_path + "%s_%s_generated.png" % (self.model_name, os.path.splitext(impath)[0])
+
+                if K.image_dim_ordering() == "th":
+                    y_pred = y_pred.transpose((1, 2, 0))
+
+                y_pred = np.clip(y_pred, 0, 255).astype('uint8')
+                img_utils.imsave(generated_path, y_pred)
+
+            print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
 
     def upscale(self, img_path, save_intermediate=False, return_image=False, suffix="scaled",
                 patch_size=8, mode="patch", verbose=True, evaluate=True):
@@ -300,9 +308,10 @@ class BaseSuperResolutionModel(object):
 
     def __match_denoise_size(self, img_height, img_width, init_height, init_width, scale_factor):
         if self.model_name in self.auto_encoder_models:
-            if ((init_height * scale_factor) % 4 != 0) or ((init_width * scale_factor) % 4 != 0):
-                print("Deep Denoise requires image size which is multiple of 4.")
+            if ((init_height * scale_factor) % 4 != 0) or ((init_width * scale_factor) % 4 != 0) or \
+                    (init_height % 2 != 0) or (init_width % 2 != 0):
 
+                print("Deep Denoise requires image size which is multiple of 4.")
                 img_height = ((init_height * scale_factor) // 4) * 4
                 img_width = ((init_width * scale_factor) // 4) * 4
             else:
@@ -458,57 +467,63 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
         if not os.path.exists(predict_path):
             os.makedirs(predict_path)
 
-        image_fns = [name for name in os.listdir(validation_dir)]
-        nb_images = len(image_fns)
-        print("Validating %d images" % (nb_images))
+        validation_path_set5 = validation_dir + "set5/"
+        validation_path_set14 = validation_dir + "set14/"
 
-        total_psnr = 0.0
+        validation_dirs = [validation_path_set5, validation_path_set14]
 
-        for impath in os.listdir(validation_dir):
-            t1 = time.time()
+        for val_dir in validation_dirs:
+            image_fns = [name for name in os.listdir(val_dir)]
+            nb_images = len(image_fns)
+            print("Validating %d images from path %s" % (nb_images, val_dir))
 
-            # Input image
-            y = img_utils.imread(validation_dir + impath, mode='RGB')
-            width, height, _ = y.shape
+            total_psnr = 0.0
 
-            y = y.astype('float32') / 255.
-            y = np.expand_dims(y, axis=0)
+            for impath in os.listdir(val_dir):
+                t1 = time.time()
 
-            x_temp = y.copy()
-            img = img_utils.gaussian_filter(x_temp[0], sigma=0.01)
-            img = img_utils.imresize(img, (width // self.scale_factor, height // self.scale_factor), interp='bicubic')
+                # Input image
+                y = img_utils.imread(val_dir + impath, mode='RGB')
+                width, height, _ = y.shape
 
-            if not small_train_images:
-                img = img_utils.imresize(img, (width, height), interp='bicubic')
+                y = y.astype('float32') / 255.
+                y = np.expand_dims(y, axis=0)
 
-            x = np.expand_dims(img, axis=0)
+                x_temp = y.copy()
+                img = img_utils.gaussian_filter(x_temp[0], sigma=0.01)
+                img = img_utils.imresize(img, (width // self.scale_factor, height // self.scale_factor), interp='bicubic')
 
-            if K.image_dim_ordering() == "th":
-                x = x.transpose((0, 3, 1, 2))
-                y = y.transpose((0, 3, 1, 2))
+                if not small_train_images:
+                    img = img_utils.imresize(img, (width, height), interp='bicubic')
 
-            self.model = self.create_model(height, width, load_weights=True)
+                x = np.expand_dims(img, axis=0)
 
-            self.evaluation_func = K.function([self.model.layers[0].input],
-                                              [self.model.layers[-1].output])
+                if K.image_dim_ordering() == "th":
+                    x = x.transpose((0, 3, 1, 2))
+                    y = y.transpose((0, 3, 1, 2))
 
-            y_pred = self.evaluation_func([x])[0][0]
+                self.model = self.create_model(height, width, load_weights=True)
 
-            psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
-            total_psnr += psnr_val
+                self.evaluation_func = K.function([self.model.layers[0].input],
+                                                  [self.model.layers[-1].output])
 
-            t2 = time.time()
-            print("Validated image : %s, Time required : %0.2f, PSNR value : %0.4f" % (impath, t2 - t1, psnr_val))
+                y_pred = self.evaluation_func([x])[0][0]
 
-            generated_path = predict_path + "%s_%s_generated.png" % (self.model_name, os.path.splitext(impath)[0])
+                psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
+                total_psnr += psnr_val
 
-            if K.image_dim_ordering() == "th":
-                y_pred = y_pred.transpose((1, 2, 0))
+                t2 = time.time()
+                print("Validated image : %s, Time required : %0.2f, PSNR value : %0.4f" % (impath, t2 - t1, psnr_val))
 
-            y_pred = np.clip(y_pred, 0, 255).astype('uint8')
-            img_utils.imsave(generated_path, y_pred)
+                generated_path = predict_path + "%s_%s_generated.png" % (self.model_name, os.path.splitext(impath)[0])
 
-        print("Average PRNS value of validation images = %00.4f" % (total_psnr / nb_images))
+                if K.image_dim_ordering() == "th":
+                    y_pred = y_pred.transpose((1, 2, 0))
+
+                y_pred = np.clip(y_pred, 0, 255).astype('uint8')
+                img_utils.imsave(generated_path, y_pred)
+
+            print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
 
 class DeepDenoiseSR(BaseSuperResolutionModel):
 

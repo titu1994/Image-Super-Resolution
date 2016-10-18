@@ -42,7 +42,7 @@ if __name__ == "__main__":
     """
 
     # esr = models.ExpantionSuperResolution(scale)
-    # esr.create_model(load_weights=False)
+    # esr.create_model()
     # esr.fit(nb_epochs=250)
 
     """
@@ -57,17 +57,17 @@ if __name__ == "__main__":
     Train Deep Denoise SR
     """
 
-    ddsr = models.DeepDenoiseSR(scale)
-    ddsr.create_model(load_weights=True)
-    ddsr.fit(nb_epochs=180)
+    # ddsr = models.DeepDenoiseSR(scale)
+    # ddsr.create_model()
+    # ddsr.fit(nb_epochs=180)
 
     """
     Train Res Net SR
     """
 
-    # rnsr = models.ResNetSR()
-    # rnsr.create_model()
-    # rnsr.fit(scale_factor=scale, nb_epochs=250)
+    rnsr = models.ResNetSR(scale)
+    rnsr.create_model()
+    rnsr.fit(nb_epochs=250)
 
     """
     Evaluate Super Resolution on Set5
@@ -96,8 +96,8 @@ if __name__ == "__main__":
     Evaluate DDSRCNN on Set5
     """
 
-    ddsr = models.DeepDenoiseSR(scale)
-    ddsr.evaluate(val_path)
+    #ddsr = models.DeepDenoiseSR(scale)
+    #ddsr.evaluate(val_path)
 
     """
     Compare output images of sr, esr, dsr and ddsr models
