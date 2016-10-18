@@ -67,24 +67,24 @@ if __name__ == "__main__":
 
     rnsr = models.ResNetSR(scale)
     rnsr.create_model()
-    rnsr.fit(nb_epochs=250)
+    rnsr.fit(nb_epochs=100)
 
     """
-    Evaluate Super Resolution on Set5
+    Evaluate Super Resolution on Set5/14
     """
 
     # sr = models.ImageSuperResolutionModel()
     # sr.evaluate(val_path, scale_factor=scale)
 
     """
-    Evaluate ESRCNN on Set5
+    Evaluate ESRCNN on Set5/14
     """
 
     #esr = models.ExpantionSuperResolution(scale)
     #esr.evaluate(val_path)
 
     """
-    Evaluate DSRCNN on Set5 cannot be performed at the moment.
+    Evaluate DSRCNN on Set5/14 cannot be performed at the moment.
     This is because this model uses Deconvolution networks, whose output shape must be pre determined.
     This causes the model to fail to predict different images of different image sizes.
     """
@@ -93,26 +93,36 @@ if __name__ == "__main__":
     #dsr.evaluate(val_path)
 
     """
-    Evaluate DDSRCNN on Set5
+    Evaluate DDSRCNN on Set5/14
     """
 
     #ddsr = models.DeepDenoiseSR(scale)
     #ddsr.evaluate(val_path)
 
     """
+    Evaluate ResNetSR on Set5/14
+    """
+
+    rnsr = models.ResNetSR(scale)
+    rnsr.evaluate(val_path)
+
+    """
     Compare output images of sr, esr, dsr and ddsr models
     """
 
-    #sr = models.ImageSuperResolutionModel()
-    #sr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="sr")
+    #sr = models.ImageSuperResolutionModel(scale)
+    #sr.upscale(path, save_intermediate=False, suffix="sr")
 
-    #esr = models.ExpantionSuperResolution()
-    #esr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="esr")
+    #esr = models.ExpantionSuperResolution(scale)
+    #esr.upscale(path, save_intermediate=False, suffix="esr")
 
-    #dsr = models.DenoisingAutoEncoderSR()
-    #dsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="dsr")
+    #dsr = models.DenoisingAutoEncoderSR(scale)
+    #dsr.upscale(path, save_intermediate=False, suffix="dsr")
 
-    #ddsr = models.DeepDenoiseSR()
-    #ddsr.upscale(path, scale_factor=scale, save_intermediate=False, suffix="ddsr")
+    #ddsr = models.DeepDenoiseSR(scale)
+    #ddsr.upscale(path, save_intermediate=False, suffix="ddsr")
+
+    #rnsr = models.ResNetSR(scale)
+    #rnsr.upscale(path, suffix="rnsr")
 
 

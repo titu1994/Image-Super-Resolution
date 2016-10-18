@@ -463,6 +463,8 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
                                                        save_history, history_fn)
 
     def evaluate(self, validation_dir, small_train_images=False):
+        print("Validating %s model" % self.model_name)
+
         predict_path = "val_predict/"
         if not os.path.exists(predict_path):
             os.makedirs(predict_path)
