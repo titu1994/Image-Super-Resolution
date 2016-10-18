@@ -152,8 +152,7 @@ class BaseSuperResolutionModel(object):
                 x_height = height if not small_train_images else height // self.scale_factor
 
                 x_temp = y.copy()
-                img = img_utils.gaussian_filter(x_temp[0], sigma=0.01)
-                img = img_utils.imresize(img, (x_width // self.scale_factor, x_height // self.scale_factor), interp='bicubic')
+                img = img_utils.imresize(x_temp[0], (x_width // self.scale_factor, x_height // self.scale_factor), interp='bicubic')
 
                 if not small_train_images:
                     img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
@@ -492,8 +491,7 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
                 y = np.expand_dims(y, axis=0)
 
                 x_temp = y.copy()
-                img = img_utils.gaussian_filter(x_temp[0], sigma=0.01)
-                img = img_utils.imresize(img, (width // self.scale_factor, height // self.scale_factor), interp='bicubic')
+                img = img_utils.imresize(x_temp[0], (width // self.scale_factor, height // self.scale_factor), interp='bicubic')
 
                 if not small_train_images:
                     img = img_utils.imresize(img, (width, height), interp='bicubic')
