@@ -58,8 +58,8 @@ if __name__ == "__main__":
     """
 
     ddsr = models.DeepDenoiseSR(scale)
-    ddsr.create_model(load_weights=False)
-    ddsr.fit(nb_epochs=60)
+    ddsr.create_model(load_weights=True)
+    ddsr.fit(nb_epochs=180)
 
     """
     Train Res Net SR

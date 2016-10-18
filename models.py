@@ -14,10 +14,10 @@ import numpy as np
 import os
 import time
 
-train_path = r"train_images/train/"
+train_path = img_utils.output_path
 validation_path = img_utils.validation_output_path
-path_X = img_utils.output_path + "/X/"
-path_Y = img_utils.output_path + "/y/"
+path_X = img_utils.output_path + "X/"
+path_Y = img_utils.output_path + "y/"
 
 def PSNRLoss(y_true, y_pred):
     """

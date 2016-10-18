@@ -18,9 +18,13 @@ assert (img_size ** 2) % (stride ** 2) == 0, "Number of images generated from st
 
 input_path = r"input_images/"
 validation_path = r"val_images/"
+validation_set5_path = validation_path + "set5/"
+validation_set14_path = validation_path + "set14/"
 
-output_path = r"train_images/train/"
-validation_output_path = r"train_images/validation/"
+base_dataset_dir = os.path.expanduser("~") + "/Image Super Resolution Dataset/"
+output_path = base_dataset_dir + "train_images/train/"
+
+validation_output_path = base_dataset_dir + r"train_images/validation/"
 
 if not os.path.exists(output_path):
     os.makedirs(output_path)
@@ -28,11 +32,11 @@ if not os.path.exists(output_path):
 def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1):
     index = 1
 
-    if not os.path.exists(output_directory + "/X/"):
-        os.makedirs(output_directory + "/X/")
+    if not os.path.exists(output_directory + "X/"):
+        os.makedirs(output_directory + "X/")
 
-    if not os.path.exists(output_directory + "/y/"):
-        os.makedirs(output_directory + "/y/")
+    if not os.path.exists(output_directory + "y/"):
+        os.makedirs(output_directory + "y/")
 
     # For each image in input_images directory
     nb_images = len([name for name in os.listdir(directory)])
@@ -99,11 +103,11 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
 
 
 def image_count():
-    return len([name for name in os.listdir(output_path + "/X/")])
+    return len([name for name in os.listdir(output_path + "X/")])
 
 
 def val_image_count():
-    return len([name for name in os.listdir(validation_output_path + "/X/")])
+    return len([name for name in os.listdir(validation_output_path + "X/")])
 
 
 def subimage_generator(img, stride, patch_size, nb_hr_images):
@@ -198,5 +202,5 @@ if __name__ == "__main__":
     scaling_factor = 2
 
     transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1)
-    transform_images(validation_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
+    transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
     pass
