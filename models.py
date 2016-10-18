@@ -98,89 +98,12 @@ class BaseSuperResolutionModel(object):
         return self.model
 
     def evaluate(self, validation_dir, small_train_images=False):
-        """
-        Evaluates the model on the Set5 Validation images
-        """
-        print("Validating %s model" % self.model_name)
-        if self.model == None: self.create_model(load_weights=True, small_train_images=small_train_images)
+        if self.model_name in self.auto_encoder_models:
+            _evaluate_denoise(self, small_train_images, validation_dir)
+        else:
+            _evaluate(self, small_train_images, validation_dir)
 
-        if self.evaluation_func is None:
-            self.evaluation_func = K.function([self.model.layers[0].input],
-                                              [self.model.layers[-1].output])
-
-        predict_path = "val_predict/"
-        if not os.path.exists(predict_path):
-            os.makedirs(predict_path)
-
-        validation_path_set5 = validation_dir + "set5/"
-        validation_path_set14 = validation_dir + "set14/"
-
-        validation_dirs = [validation_path_set5, validation_path_set14]
-
-        for val_dir in validation_dirs:
-            image_fns = [name for name in os.listdir(val_dir)]
-            nb_images = len(image_fns)
-            print("Validating %d images from path %s" % (nb_images, val_dir))
-
-            total_psnr = 0.0
-
-            for impath in os.listdir(val_dir):
-                t1 = time.time()
-
-                # Input image
-                y = img_utils.imread(val_dir + impath, mode='RGB')
-                width, height, _ = y.shape
-
-                if self.model_name in self.auto_encoder_models:
-                    # Denoise models require precise width and height, divisible by 4
-
-                    if ((width // self.scale_factor) % 4 != 0) or ((height // self.scale_factor) % 4 != 0)\
-                            or (width % 2 != 0) or (height % 2 != 0):
-
-                        width = ((width // self.scale_factor) // 4) * 4 * self.scale_factor
-                        height = ((height // self.scale_factor) // 4) * 4 * self.scale_factor
-
-                        print("Model %s require the image size to be divisible by 4. New image size = (%d, %d)" % \
-                            (self.model_name, width, height))
-
-                        y = img_utils.imresize(y, (width, height), interp='bicubic')
-
-                y = y.astype('float32') / 255.
-                y = np.expand_dims(y, axis=0)
-
-                x_width = width if not small_train_images else width // self.scale_factor
-                x_height = height if not small_train_images else height // self.scale_factor
-
-                x_temp = y.copy()
-                img = img_utils.imresize(x_temp[0], (x_width // self.scale_factor, x_height // self.scale_factor), interp='bicubic')
-
-                if not small_train_images:
-                    img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
-
-                x = np.expand_dims(img, axis=0)
-
-                if K.image_dim_ordering() == "th":
-                    x = x.transpose((0, 3, 1, 2))
-                    y = y.transpose((0, 3, 1, 2))
-
-                y_pred = self.evaluation_func([x])[0][0]
-
-                psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
-                total_psnr += psnr_val
-
-                t2 = time.time()
-                print("Validated image : %s, Time required : %0.2f, PSNR value : %0.4f" % (impath, t2 - t1, psnr_val))
-
-                generated_path = predict_path + "%s_%s_generated.png" % (self.model_name, os.path.splitext(impath)[0])
-
-                if K.image_dim_ordering() == "th":
-                    y_pred = y_pred.transpose((1, 2, 0))
-
-                y_pred = np.clip(y_pred, 0, 255).astype('uint8')
-                img_utils.imsave(generated_path, y_pred)
-
-            print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
-
+    
     def upscale(self, img_path, save_intermediate=False, return_image=False, suffix="scaled",
                 patch_size=8, mode="patch", verbose=True, evaluate=True):
         """
@@ -316,6 +239,161 @@ class BaseSuperResolutionModel(object):
             else:
                 img_height, img_width = init_height, init_width
         return img_height, img_width
+
+
+def _evaluate(sr_model : BaseSuperResolutionModel, small_train_images, validation_dir):
+    """
+        Evaluates the model on the Validation images
+        """
+    print("Validating %s model" % sr_model.model_name)
+    if sr_model.model == None: sr_model.create_model(load_weights=True, small_train_images=small_train_images)
+    if sr_model.evaluation_func is None:
+        sr_model.evaluation_func = K.function([sr_model.model.layers[0].input],
+                                              [sr_model.model.layers[-1].output])
+    predict_path = "val_predict/"
+    if not os.path.exists(predict_path):
+        os.makedirs(predict_path)
+    validation_path_set5 = validation_dir + "set5/"
+    validation_path_set14 = validation_dir + "set14/"
+    validation_dirs = [validation_path_set5, validation_path_set14]
+    for val_dir in validation_dirs:
+        image_fns = [name for name in os.listdir(val_dir)]
+        nb_images = len(image_fns)
+        print("Validating %d images from path %s" % (nb_images, val_dir))
+
+        total_psnr = 0.0
+
+        for impath in os.listdir(val_dir):
+            t1 = time.time()
+
+            # Input image
+            y = img_utils.imread(val_dir + impath, mode='RGB')
+            width, height, _ = y.shape
+
+            if sr_model.model_name in sr_model.auto_encoder_models:
+                # Denoise models require precise width and height, divisible by 4
+
+                if ((width // sr_model.scale_factor) % 4 != 0) or ((height // sr_model.scale_factor) % 4 != 0) \
+                        or (width % 2 != 0) or (height % 2 != 0):
+                    width = ((width // sr_model.scale_factor) // 4) * 4 * sr_model.scale_factor
+                    height = ((height // sr_model.scale_factor) // 4) * 4 * sr_model.scale_factor
+
+                    print("Model %s require the image size to be divisible by 4. New image size = (%d, %d)" % \
+                          (sr_model.model_name, width, height))
+
+                    y = img_utils.imresize(y, (width, height), interp='bicubic')
+
+            y = y.astype('float32') / 255.
+            y -= 0.5
+            y = np.expand_dims(y, axis=0)
+
+            x_width = width if not small_train_images else width // sr_model.scale_factor
+            x_height = height if not small_train_images else height // sr_model.scale_factor
+
+            x_temp = y.copy()
+            img = img_utils.imresize(x_temp[0], (x_width // sr_model.scale_factor, x_height // sr_model.scale_factor),
+                                     interp='bicubic')
+
+            if not small_train_images:
+                img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
+
+            x = np.expand_dims(img, axis=0)
+
+            if K.image_dim_ordering() == "th":
+                x = x.transpose((0, 3, 1, 2))
+                y = y.transpose((0, 3, 1, 2))
+
+            y_pred = sr_model.evaluation_func([x])[0][0]
+
+            psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
+            total_psnr += psnr_val
+
+            t2 = time.time()
+            print("Validated image : %s, Time required : %0.2f, PSNR value : %0.4f" % (impath, t2 - t1, psnr_val))
+
+            generated_path = predict_path + "%s_%s_generated.png" % (sr_model.model_name, os.path.splitext(impath)[0])
+
+            if K.image_dim_ordering() == "th":
+                y_pred = y_pred.transpose((1, 2, 0))
+
+            y_pred = np.clip(y_pred, 0, 255).astype('uint8')
+            img_utils.imsave(generated_path, y_pred)
+
+        print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
+
+
+def _evaluate_denoise(sr_model : BaseSuperResolutionModel, small_train_images, validation_dir):
+    print("Validating %s model" % sr_model.model_name)
+    predict_path = "val_predict/"
+    if not os.path.exists(predict_path):
+        os.makedirs(predict_path)
+    validation_path_set5 = validation_dir + "set5/"
+    validation_path_set14 = validation_dir + "set14/"
+    validation_dirs = [validation_path_set5, validation_path_set14]
+    for val_dir in validation_dirs:
+        image_fns = [name for name in os.listdir(val_dir)]
+        nb_images = len(image_fns)
+        print("Validating %d images from path %s" % (nb_images, val_dir))
+
+        total_psnr = 0.0
+
+        for impath in os.listdir(val_dir):
+            t1 = time.time()
+
+            # Input image
+            y = img_utils.imread(val_dir + impath, mode='RGB')
+            width, height, _ = y.shape
+
+            if ((width // sr_model.scale_factor) % 4 != 0) or ((height // sr_model.scale_factor) % 4 != 0) \
+                    or (width % 2 != 0) or (height % 2 != 0):
+                width = ((width // sr_model.scale_factor) // 4) * 4 * sr_model.scale_factor
+                height = ((height // sr_model.scale_factor) // 4) * 4 * sr_model.scale_factor
+
+                print("Model %s require the image size to be divisible by 4. New image size = (%d, %d)" % \
+                      (sr_model.model_name, width, height))
+
+                y = img_utils.imresize(y, (width, height), interp='bicubic')
+
+            y = y.astype('float32') / 255.
+            y -= 0.5
+            y = np.expand_dims(y, axis=0)
+
+            x_temp = y.copy()
+            img = img_utils.imresize(x_temp[0], (width // sr_model.scale_factor, height // sr_model.scale_factor),
+                                     interp='bicubic')
+
+            if not small_train_images:
+                img = img_utils.imresize(img, (width, height), interp='bicubic')
+
+            x = np.expand_dims(img, axis=0)
+
+            if K.image_dim_ordering() == "th":
+                x = x.transpose((0, 3, 1, 2))
+                y = y.transpose((0, 3, 1, 2))
+
+            sr_model.model = sr_model.create_model(height, width, load_weights=True)
+
+            sr_model.evaluation_func = K.function([sr_model.model.layers[0].input],
+                                                  [sr_model.model.layers[-1].output])
+
+            y_pred = sr_model.evaluation_func([x])[0][0]
+
+            psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
+            total_psnr += psnr_val
+
+            t2 = time.time()
+            print("Validated image : %s, Time required : %0.2f, PSNR value : %0.4f" % (impath, t2 - t1, psnr_val))
+
+            generated_path = predict_path + "%s_%s_generated.png" % (sr_model.model_name, os.path.splitext(impath)[0])
+
+            if K.image_dim_ordering() == "th":
+                y_pred = y_pred.transpose((1, 2, 0))
+
+            y_pred = np.clip(y_pred, 0, 255).astype('uint8')
+            img_utils.imsave(generated_path, y_pred)
+
+        print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
+
 
 
 class ImageSuperResolutionModel(BaseSuperResolutionModel):
@@ -461,70 +539,6 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
         return super(DenoisingAutoEncoderSR, self).fit(batch_size, nb_epochs, small_train_images,
                                                        save_history, history_fn)
 
-    def evaluate(self, validation_dir, small_train_images=False):
-        print("Validating %s model" % self.model_name)
-
-        predict_path = "val_predict/"
-        if not os.path.exists(predict_path):
-            os.makedirs(predict_path)
-
-        validation_path_set5 = validation_dir + "set5/"
-        validation_path_set14 = validation_dir + "set14/"
-
-        validation_dirs = [validation_path_set5, validation_path_set14]
-
-        for val_dir in validation_dirs:
-            image_fns = [name for name in os.listdir(val_dir)]
-            nb_images = len(image_fns)
-            print("Validating %d images from path %s" % (nb_images, val_dir))
-
-            total_psnr = 0.0
-
-            for impath in os.listdir(val_dir):
-                t1 = time.time()
-
-                # Input image
-                y = img_utils.imread(val_dir + impath, mode='RGB')
-                width, height, _ = y.shape
-
-                y = y.astype('float32') / 255.
-                y = np.expand_dims(y, axis=0)
-
-                x_temp = y.copy()
-                img = img_utils.imresize(x_temp[0], (width // self.scale_factor, height // self.scale_factor), interp='bicubic')
-
-                if not small_train_images:
-                    img = img_utils.imresize(img, (width, height), interp='bicubic')
-
-                x = np.expand_dims(img, axis=0)
-
-                if K.image_dim_ordering() == "th":
-                    x = x.transpose((0, 3, 1, 2))
-                    y = y.transpose((0, 3, 1, 2))
-
-                self.model = self.create_model(height, width, load_weights=True)
-
-                self.evaluation_func = K.function([self.model.layers[0].input],
-                                                  [self.model.layers[-1].output])
-
-                y_pred = self.evaluation_func([x])[0][0]
-
-                psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
-                total_psnr += psnr_val
-
-                t2 = time.time()
-                print("Validated image : %s, Time required : %0.2f, PSNR value : %0.4f" % (impath, t2 - t1, psnr_val))
-
-                generated_path = predict_path + "%s_%s_generated.png" % (self.model_name, os.path.splitext(impath)[0])
-
-                if K.image_dim_ordering() == "th":
-                    y_pred = y_pred.transpose((1, 2, 0))
-
-                y_pred = np.clip(y_pred, 0, 255).astype('uint8')
-                img_utils.imsave(generated_path, y_pred)
-
-            print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
-
 class DeepDenoiseSR(BaseSuperResolutionModel):
 
     def __init__(self, scale_factor):
@@ -600,7 +614,7 @@ class ResNetSR(BaseSuperResolutionModel):
         self.auto_encoder_models.append(self.model_name)
 
         self.n = 64
-        self.mode = 2
+        self.mode = 0
 
         self.weight_path = "weights/ResNetSR %dX.h5" % (self.scale_factor)
 
@@ -669,3 +683,5 @@ class ResNetSR(BaseSuperResolutionModel):
     def fit(self, batch_size=128, nb_epochs=100, small_train_images=False,
                                 save_history=True, history_fn="ResNetSR History.txt"):
         super(ResNetSR, self).fit(batch_size, nb_epochs, small_train_images, save_history, history_fn)
+
+        self.model.save_weights("weights/ResNetSR Full.h5")

@@ -30,7 +30,7 @@ validation_output_path = base_dataset_dir + r"train_images/validation/"
 if not os.path.exists(output_path):
     os.makedirs(output_path)
 
-def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1):
+def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1, val_imgs=False):
     index = 1
 
     if not os.path.exists(output_directory + "X/"):
@@ -138,8 +138,12 @@ def block_view(A, block):
     strides= (block[0] * A.strides[0], block[1] * A.strides[1], block[2] * A.strides[2])+ A.strides
     return as_strided(A, shape= shape, strides= strides)
 
-def image_generator(directory, scale_factor=2, small_train_images=False , shuffle=True, batch_size=32, seed=None):
-    image_shape = (3, 16 * scale_factor, 16 * scale_factor)
+def image_generator(directory, scale_factor=2, target_shape=None, small_train_images=False , shuffle=True,
+                    batch_size=32, seed=None):
+    if not target_shape:
+        image_shape = (3, 16 * scale_factor, 16 * scale_factor)
+    else:
+        image_shape = (3,) + target_shape
 
     file_names = [f for f in sorted(os.listdir(directory + "X/"))]
     X_filenames = [os.path.join(directory, "X", f) for f in file_names]
@@ -162,11 +166,13 @@ def image_generator(directory, scale_factor=2, small_train_images=False , shuffl
             if small_train_images:
                 img = imresize(img, (16, 16))
             img = img.astype('float32') / 255.
+            img -= 0.5
             batch_x[i] = img.transpose((2, 0, 1))
 
             y_fn = y_filenames[j]
             img = imread(y_fn, mode="RGB")
             img = img.astype('float32') / 255.
+            img -= 0.5
             batch_y[i] = img.transpose((2, 0, 1))
 
         yield (batch_x, batch_y)
@@ -202,6 +208,6 @@ if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images
     scaling_factor = 2
 
-    transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1)
+    #transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1)
     transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
     pass

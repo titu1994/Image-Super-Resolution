@@ -66,8 +66,8 @@ if __name__ == "__main__":
     """
 
     rnsr = models.ResNetSR(scale)
-    rnsr.create_model()
-    rnsr.fit(nb_epochs=100)
+    rnsr.create_model(load_weights=False, batch_size=1)
+    rnsr.fit(nb_epochs=150)
 
     """
     Evaluate Super Resolution on Set5/14
