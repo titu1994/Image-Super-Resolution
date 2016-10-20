@@ -166,13 +166,11 @@ def image_generator(directory, scale_factor=2, target_shape=None, small_train_im
             if small_train_images:
                 img = imresize(img, (16, 16))
             img = img.astype('float32') / 255.
-            img -= 0.5
             batch_x[i] = img.transpose((2, 0, 1))
 
             y_fn = y_filenames[j]
             img = imread(y_fn, mode="RGB")
             img = img.astype('float32') / 255.
-            img -= 0.5
             batch_y[i] = img.transpose((2, 0, 1))
 
         yield (batch_x, batch_y)

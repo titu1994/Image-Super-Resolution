@@ -2,6 +2,7 @@ from keras.callbacks import Callback
 from keras.regularizers import ActivityRegularizer
 from keras import backend as K
 
+''' Callbacks '''
 class HistoryCheckpoint(Callback):
     '''Callback that records events
         into a `History` object.
@@ -41,30 +42,27 @@ class HistoryCheckpoint(Callback):
         with open(self.filename, "w") as f:
             f.write(str(self.history))
 
-class TVRegularizer(ActivityRegularizer):
-    """ Enforces smoothness in image output. """
 
-    def __init__(self, img_width, img_height, weight=2e-8):
-        super(TVRegularizer, self).__init__()
-        self.img_width = img_width
-        self.img_height = img_height
-        self.weight = weight
-        self.uses_learning_phase = False
+''' Theano Backend function '''
 
-    def __call__(self, loss):
-        x = self.layer.output
-        assert K.ndim(x) == 4
-        if K.image_dim_ordering() == 'th':
-            a = K.square(x[:, :, :self.img_width - 1, :self.img_height - 1] - x[:, :, 1:, :self.img_height - 1])
-            b = K.square(x[:, :, :self.img_width - 1, :self.img_height - 1] - x[:, :, :self.img_width - 1, 1:])
-        else:
-            a = K.square(x[:, :self.img_width - 1, :self.img_height - 1, :] - x[:, 1:, :self.img_height - 1, :])
-            b = K.square(x[:, :self.img_width - 1, :self.img_height - 1, :] - x[:, :self.img_width - 1, 1:, :])
-        loss += self.weight * K.mean(K.sum(K.pow(a + b, 1.25)))
-        return loss
+def depth_to_scale(x, scale, dim_ordering=K.image_dim_ordering(), name=None):
+    ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
 
-    def get_config(self):
-        return {'name' : self.__class__.__name__,
-                'img_width' : self.img_width,
-                'img_height' : self.img_height,
-                'weight' : self.weight}
+    import theano.tensor as T
+
+    if dim_ordering == "tf":
+        x = x.transpose((0, 3, 1, 2))
+
+    b, k, r, c = x.shape
+
+    out = K.zeros((b, k / (scale * scale), r * scale, c * scale))
+
+    for i in range(scale):
+        for j in range(scale):
+            T.set_subtensor(out[:, :, i :: scale, j :: scale],
+                            x[:, scale * i + j :: scale * scale, :, :], inplace=True)
+
+    if dim_ordering == 'tf':
+        out = out.transpose((0, 2, 3, 1))
+
+    return out

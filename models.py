@@ -7,7 +7,7 @@ from keras import backend as K
 import keras.callbacks as callbacks
 import keras.optimizers as optimizers
 
-from advanced import HistoryCheckpoint, TVRegularizer
+from advanced import HistoryCheckpoint
 import img_utils
 
 import numpy as np
@@ -52,14 +52,12 @@ class BaseSuperResolutionModel(object):
         self.weight_path = None
 
         self.auto_encoder_models = []
-
-        self.n1 = 64
-        self.n2 = 32
+        self.true_upsampling = False
 
         self.evaluation_func = None
+        self.uses_learning_phase = False
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128,
-                     small_train_images=False) -> Model:
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128) -> Model:
         """
         Subclass dependent implementation.
         """
@@ -67,10 +65,16 @@ class BaseSuperResolutionModel(object):
             assert height % 4 == 0, "Height of the image must be divisible by 4"
             assert width % 4 == 0, "Width of the image must be divisible by 4"
 
-        pass
+        if K.image_dim_ordering() == "th":
+            shape = (channels, width, height)
+        else:
+            shape = (width, height, channels)
 
-    def fit(self, batch_size=128, nb_epochs=100, small_train_images=False,
-                                save_history=True, history_fn="Model History.txt") -> Model:
+        init = Input(shape=shape)
+
+        return init
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="Model History.txt") -> Model:
         """
         Standard method to train any of the models.
         """
@@ -85,27 +89,27 @@ class BaseSuperResolutionModel(object):
 
         print("Training model : %s" % (self.__class__.__name__))
         self.model.fit_generator(img_utils.image_generator(train_path, scale_factor=self.scale_factor,
-                                                           small_train_images=small_train_images,
+                                                           small_train_images=self.true_upsampling,
                                                            batch_size=batch_size),
                                  samples_per_epoch=samples_per_epoch,
                                  nb_epoch=nb_epochs, callbacks=callback_list,
                                  validation_data=img_utils.image_generator(validation_path,
                                                                           scale_factor=self.scale_factor,
-                                                                          small_train_images=small_train_images,
+                                                                          small_train_images=self.true_upsampling,
                                                                           batch_size=batch_size),
                                  nb_val_samples=val_count)
 
         return self.model
 
-    def evaluate(self, validation_dir, small_train_images=False):
+    def evaluate(self, validation_dir):
         if self.model_name in self.auto_encoder_models:
-            _evaluate_denoise(self, small_train_images, validation_dir)
+            _evaluate_denoise(self, validation_dir)
         else:
-            _evaluate(self, small_train_images, validation_dir)
+            _evaluate(self, validation_dir)
 
     
     def upscale(self, img_path, save_intermediate=False, return_image=False, suffix="scaled",
-                patch_size=8, mode="patch", verbose=True, evaluate=True):
+                patch_size=8, mode="patch", verbose=True):
         """
         Standard method to upscale an image.
 
@@ -134,6 +138,11 @@ class BaseSuperResolutionModel(object):
 
         img_height, img_width = 0, 0
 
+        if mode == "patch" and self.true_upsampling:
+            # Overriding mode for True Upscaling models
+            mode = 'fast'
+            print("Patch mode does not work with True Upscaling models yet. Defaulting to mode='fast'")
+
         if mode == 'patch':
             # Create patches
             if self.model_name in self.auto_encoder_models:
@@ -148,8 +157,8 @@ class BaseSuperResolutionModel(object):
             print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_images, img_height, img_width))
         else:
             # Use full image for super resolution
-            img_width, img_height = self.__match_denoise_size(img_height, img_width, init_height,
-                                                              init_width, scale_factor)
+            img_width, img_height = self.__match_autoencoder_size(img_height, img_width, init_height,
+                                                                  init_width, scale_factor)
 
             images = imresize(true_img, (img_width, img_height))
             images = np.expand_dims(images, axis=0)
@@ -201,54 +210,55 @@ class BaseSuperResolutionModel(object):
         if verbose: print("Saving image.")
         imsave(filename, result)
 
-        if evaluate:
-            if verbose: print("Evaluating results.")
-            # Convert initial image into correct format
-            if intermediate_img is None:
-                intermediate_img = imresize(true_img, (init_width * scale_factor, init_height * scale_factor))
-
-            if mode == 'patch':
-                intermediate_img = img_utils.make_patches(intermediate_img, scale_factor, patch_size, upscale=False)
-            else:
-                img_width, img_height = self.__match_denoise_size(img_height, img_width, init_height,
-                                                                  init_width, scale_factor)
-
-                intermediate_img = imresize(true_img, (img_width, img_height))
-                intermediate_img = np.expand_dims(intermediate_img, axis=0)
-
-            if K.image_dim_ordering() == "th":
-                intermediate_img = intermediate_img.transpose((0, 3, 1, 2)).astype(np.float32) / 255.
-            else:
-                intermediate_img = intermediate_img.astype(np.float32) / 255.
-
-            eval_model = self.create_model(img_height, img_width, load_weights=True)
-
-            # Evaluating the initial image patches, which gets transformed to the output image, to the input image
-            error = eval_model.evaluate(img_conv, intermediate_img, batch_size=128)
-            print("\nMean Squared Error of %s  : " % (self.model_name), error[0])
-            print("Peak Signal to Noise Ratio of %s : " % (self.model_name), error[1])
-
-    def __match_denoise_size(self, img_height, img_width, init_height, init_width, scale_factor):
+    def __match_autoencoder_size(self, img_height, img_width, init_height, init_width, scale_factor):
         if self.model_name in self.auto_encoder_models:
-            if ((init_height * scale_factor) % 4 != 0) or ((init_width * scale_factor) % 4 != 0) or \
-                    (init_height % 2 != 0) or (init_width % 2 != 0):
+            if not self.true_upsampling:
+                # AE model but not true upsampling
+                if ((init_height * scale_factor) % 4 != 0) or ((init_width * scale_factor) % 4 != 0) or \
+                        (init_height % 2 != 0) or (init_width % 2 != 0):
 
-                print("Deep Denoise requires image size which is multiple of 4.")
-                img_height = ((init_height * scale_factor) // 4) * 4
-                img_width = ((init_width * scale_factor) // 4) * 4
+                    print("AE models requires image size which is multiple of 4.")
+                    img_height = ((init_height * scale_factor) // 4) * 4
+                    img_width = ((init_width * scale_factor) // 4) * 4
+
+                else:
+                    # No change required
+                    img_height, img_width = init_height * scale_factor, init_width * scale_factor
             else:
+                # AE model and true upsampling
+                if ((init_height) % 4 != 0) or ((init_width) % 4 != 0) or \
+                        (init_height % 2 != 0) or (init_width % 2 != 0):
+
+                    print("AE models requires image size which is multiple of 4.")
+                    img_height = ((init_height) // 4) * 4
+                    img_width = ((init_width) // 4) * 4
+
+                else:
+                    # No change required
+                    img_height, img_width = init_height, init_width
+        else:
+            # Not AE but true upsampling
+            if self.true_upsampling:
                 img_height, img_width = init_height, init_width
+            else:
+                # Not AE and not true upsampling
+                img_height, img_width = init_height * scale_factor, init_width * scale_factor
+
         return img_height, img_width
 
 
-def _evaluate(sr_model : BaseSuperResolutionModel, small_train_images, validation_dir):
+def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir):
     """
         Evaluates the model on the Validation images
         """
     print("Validating %s model" % sr_model.model_name)
-    if sr_model.model == None: sr_model.create_model(load_weights=True, small_train_images=small_train_images)
+    if sr_model.model == None: sr_model.create_model(load_weights=True)
     if sr_model.evaluation_func is None:
-        sr_model.evaluation_func = K.function([sr_model.model.layers[0].input],
+        if sr_model.uses_learning_phase:
+            sr_model.evaluation_func = K.function([sr_model.model.layers[0].input, K.learning_phase()],
+                                                  [sr_model.model.layers[-1].output])
+        else:
+            sr_model.evaluation_func = K.function([sr_model.model.layers[0].input],
                                               [sr_model.model.layers[-1].output])
     predict_path = "val_predict/"
     if not os.path.exists(predict_path):
@@ -284,17 +294,16 @@ def _evaluate(sr_model : BaseSuperResolutionModel, small_train_images, validatio
                     y = img_utils.imresize(y, (width, height), interp='bicubic')
 
             y = y.astype('float32') / 255.
-            y -= 0.5
             y = np.expand_dims(y, axis=0)
 
-            x_width = width if not small_train_images else width // sr_model.scale_factor
-            x_height = height if not small_train_images else height // sr_model.scale_factor
+            x_width = width if not sr_model.true_upsampling else width // sr_model.scale_factor
+            x_height = height if not sr_model.true_upsampling else height // sr_model.scale_factor
 
             x_temp = y.copy()
             img = img_utils.imresize(x_temp[0], (x_width // sr_model.scale_factor, x_height // sr_model.scale_factor),
                                      interp='bicubic')
 
-            if not small_train_images:
+            if not sr_model.true_upsampling:
                 img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
 
             x = np.expand_dims(img, axis=0)
@@ -303,7 +312,10 @@ def _evaluate(sr_model : BaseSuperResolutionModel, small_train_images, validatio
                 x = x.transpose((0, 3, 1, 2))
                 y = y.transpose((0, 3, 1, 2))
 
-            y_pred = sr_model.evaluation_func([x])[0][0]
+            if sr_model.uses_learning_phase:
+                y_pred = sr_model.evaluation_func([x, 0])[0][0]
+            else:
+                y_pred = sr_model.evaluation_func([x])[0][0]
 
             psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
             total_psnr += psnr_val
@@ -322,13 +334,15 @@ def _evaluate(sr_model : BaseSuperResolutionModel, small_train_images, validatio
         print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
 
 
-def _evaluate_denoise(sr_model : BaseSuperResolutionModel, small_train_images, validation_dir):
+def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir):
     print("Validating %s model" % sr_model.model_name)
     predict_path = "val_predict/"
     if not os.path.exists(predict_path):
         os.makedirs(predict_path)
+
     validation_path_set5 = validation_dir + "set5/"
     validation_path_set14 = validation_dir + "set14/"
+
     validation_dirs = [validation_path_set5, validation_path_set14]
     for val_dir in validation_dirs:
         image_fns = [name for name in os.listdir(val_dir)]
@@ -355,14 +369,13 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, small_train_images, v
                 y = img_utils.imresize(y, (width, height), interp='bicubic')
 
             y = y.astype('float32') / 255.
-            y -= 0.5
             y = np.expand_dims(y, axis=0)
 
             x_temp = y.copy()
             img = img_utils.imresize(x_temp[0], (width // sr_model.scale_factor, height // sr_model.scale_factor),
                                      interp='bicubic')
 
-            if not small_train_images:
+            if not sr_model.true_upsampling:
                 img = img_utils.imresize(img, (width, height), interp='bicubic')
 
             x = np.expand_dims(img, axis=0)
@@ -373,10 +386,18 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, small_train_images, v
 
             sr_model.model = sr_model.create_model(height, width, load_weights=True)
 
-            sr_model.evaluation_func = K.function([sr_model.model.layers[0].input],
-                                                  [sr_model.model.layers[-1].output])
+            if sr_model.evaluation_func is None:
+                if sr_model.uses_learning_phase:
+                    sr_model.evaluation_func = K.function([sr_model.model.layers[0].input, K.learning_phase()],
+                                                          [sr_model.model.layers[-1].output])
+                else:
+                    sr_model.evaluation_func = K.function([sr_model.model.layers[0].input],
+                                                      [sr_model.model.layers[-1].output])
 
-            y_pred = sr_model.evaluation_func([x])[0][0]
+            if sr_model.uses_learning_phase:
+                y_pred = sr_model.evaluation_func([x, 0])[0][0]
+            else:
+                y_pred = sr_model.evaluation_func([x])[0][0]
 
             psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
             total_psnr += psnr_val
@@ -405,20 +426,16 @@ class ImageSuperResolutionModel(BaseSuperResolutionModel):
         self.f2 = 1
         self.f3 = 5
 
+        self.n1 = 64
+        self.n2 = 32
+
         self.weight_path = "weights/SR Weights %dX.h5" % (self.scale_factor)
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128,
-                     small_train_images=False):
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
         """
             Creates a model to be used to scale images of specific height and width.
         """
-
-        if K.image_dim_ordering() == "th":
-            shape = (channels, width, height)
-        else:
-            shape = (width, height, channels)
-
-        init = Input(shape=shape)
+        init = super(ImageSuperResolutionModel, self).create_model(height, width, channels, load_weights, batch_size)
 
         x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
         x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
@@ -434,10 +451,8 @@ class ImageSuperResolutionModel(BaseSuperResolutionModel):
         self.model = model
         return model
 
-    def fit(self, batch_size=128, nb_epochs=100, small_train_images=False,
-                                save_history=True, history_fn="SRCNN History.txt"):
-        return super(ImageSuperResolutionModel, self).fit(batch_size, nb_epochs,small_train_images,
-                                                          save_history, history_fn)
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="SRCNN History.txt"):
+        return super(ImageSuperResolutionModel, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
 
 class ExpantionSuperResolution(BaseSuperResolutionModel):
@@ -451,19 +466,16 @@ class ExpantionSuperResolution(BaseSuperResolutionModel):
         self.f2_3 = 5
         self.f3 = 5
 
+        self.n1 = 64
+        self.n2 = 32
+
         self.weight_path = "weights/Expantion SR Weights %dX.h5" % (self.scale_factor)
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128,
-                     small_train_images=False):
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
         """
             Creates a model to be used to scale images of specific height and width.
         """
-        if K.image_dim_ordering() == "th":
-            shape = (channels, width, height)
-        else:
-            shape = (width, height, channels)
-
-        init = Input(shape=shape)
+        init = super(ExpantionSuperResolution, self).create_model(height, width, channels, load_weights, batch_size)
 
         x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
 
@@ -483,10 +495,8 @@ class ExpantionSuperResolution(BaseSuperResolutionModel):
         self.model = model
         return model
 
-    def fit(self, batch_size=128, nb_epochs=100, small_train_images=False,
-                                save_history=True, history_fn="ESRCNN History.txt"):
-        return super(ExpantionSuperResolution, self).fit(batch_size, nb_epochs, small_train_images,
-                                                         save_history, history_fn)
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ESRCNN History.txt"):
+        return super(ExpantionSuperResolution, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
 
 class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
@@ -494,26 +504,24 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
     def __init__(self, scale_factor):
         super(DenoisingAutoEncoderSR, self).__init__("Denoise AutoEncoder SR", scale_factor)
 
+        self.n1 = 64
+        self.n2 = 32
+
         self.weight_path = "weights/Denoising AutoEncoder %dX.h5" % (self.scale_factor)
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128,
-                     small_train_images=False):
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
         """
             Creates a model to remove / reduce noise from upscaled images.
         """
         from keras.layers.convolutional import Deconvolution2D
 
         # Perform check that model input shape is divisible by 4
-        super(DenoisingAutoEncoderSR, self).create_model(height, width)
+        init = super(DenoisingAutoEncoderSR, self).create_model(height, width, channels, load_weights, batch_size)
 
         if K.image_dim_ordering() == "th":
-            shape = (channels, width, height)
             output_shape = (None, channels, width, height)
         else:
-            shape = (width, height, channels)
             output_shape = (None, width, height, channels)
-
-        init = Input(shape=shape)
 
         level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
         level2_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_1)
@@ -534,10 +542,8 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
         self.model = model
         return model
 
-    def fit(self, batch_size=128, nb_epochs=100, small_train_images=False,
-                                save_history=True, history_fn="DSRCNN History.txt"):
-        return super(DenoisingAutoEncoderSR, self).fit(batch_size, nb_epochs, small_train_images,
-                                                       save_history, history_fn)
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="DSRCNN History.txt"):
+        return super(DenoisingAutoEncoderSR, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
 class DeepDenoiseSR(BaseSuperResolutionModel):
 
@@ -554,16 +560,9 @@ class DeepDenoiseSR(BaseSuperResolutionModel):
 
         self.weight_path = "weights/Deep Denoise Weights %dX.h5" % (self.scale_factor)
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128, small_train_images=False):
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
         # Perform check that model input shape is divisible by 4
-        super(DeepDenoiseSR, self).create_model(height, width)
-
-        if K.image_dim_ordering() == "th":
-            shape = (channels, width, height)
-        else:
-            shape = (width, height, channels)
-
-        init = Input(shape=shape)
+        init = super(DeepDenoiseSR, self).create_model(height, width, channels, load_weights, batch_size)
 
         c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
         c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(c1)
@@ -600,9 +599,8 @@ class DeepDenoiseSR(BaseSuperResolutionModel):
         self.model = model
         return model
 
-    def fit(self, batch_size=128, nb_epochs=100, small_train_images=False,
-                                save_history=True, history_fn="Deep DSRCNN History.txt"):
-        super(DeepDenoiseSR, self).fit(batch_size, nb_epochs, small_train_images, save_history, history_fn)
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="Deep DSRCNN History.txt"):
+        super(DeepDenoiseSR, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
 class ResNetSR(BaseSuperResolutionModel):
 
@@ -612,22 +610,15 @@ class ResNetSR(BaseSuperResolutionModel):
         # Treat this model as a denoising auto encoder
         # Force the fit, evaluate and upscale methods to take special care about image shape
         self.auto_encoder_models.append(self.model_name)
+        self.uses_learning_phase = True
 
         self.n = 64
         self.mode = 0
 
         self.weight_path = "weights/ResNetSR %dX.h5" % (self.scale_factor)
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128, small_train_images=False):
-        assert height % 4 == 0, "Height of the image must be divisible by 4"
-        assert width % 4 == 0, "Width of the image must be divisible by 4"
-
-        if K.image_dim_ordering() == "th":
-            shape = (channels, width, height)
-        else:
-            shape = (width, height, channels)
-
-        init = Input(shape=shape)
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
+        init =  super(ResNetSR, self).create_model(height, width, channels, load_weights, batch_size)
 
         x0 = Convolution2D(64, 3, 3, activation='relu', border_mode='same', name='sr_res_conv1')(init)
 
@@ -651,9 +642,7 @@ class ResNetSR(BaseSuperResolutionModel):
 
         x = merge([x, x0], mode='sum')
 
-        tv_regularizer = TVRegularizer(img_width=width, img_height=height, weight=2e-8)
-        x = Convolution2D(3, 3, 3, activation="linear", border_mode='same', activity_regularizer=tv_regularizer,
-                          name='sr_res_conv_final')(x)
+        x = Convolution2D(3, 3, 3, activation="linear", border_mode='same', name='sr_res_conv_final')(x)
 
         model = Model(init, x)
 
@@ -680,8 +669,31 @@ class ResNetSR(BaseSuperResolutionModel):
 
         return m
 
-    def fit(self, batch_size=128, nb_epochs=100, small_train_images=False,
-                                save_history=True, history_fn="ResNetSR History.txt"):
-        super(ResNetSR, self).fit(batch_size, nb_epochs, small_train_images, save_history, history_fn)
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ResNetSR History.txt"):
+        super(ResNetSR, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
         self.model.save_weights("weights/ResNetSR Full.h5")
+
+
+class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
+
+    def __init__(self, scale_factor):
+        super(EfficientSubPixelConvolutionalSR, self).__init__("ESPCNN SR", scale_factor)
+
+        self.n1 = 64
+        self.n2 = 32
+
+        self.f1 = 5
+        self.f2 = 3
+        self.f3 = 3
+
+        # Flag to denote that this is a "true" upsampling model.
+        # Image size will be multiplied by scale factor to get output image size
+        self.true_upsampling = True
+
+    def create_model(self, height=16, width=16, channels=3, load_weights=False, batch_size=128):
+        # Note height, width = 16 instead of 32 like usual
+        init = super(EfficientSubPixelConvolutionalSR, self).create_model(height, width, channels,
+                                                                          load_weights, batch_size)
+
+

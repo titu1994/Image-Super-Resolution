@@ -47,5 +47,4 @@ elif model_type == "rnsr":
 else:
     model = models.DeepDenoiseSR(scale_factor)
 
-model.upscale(path, save_intermediate=save, evaluate=False, mode=mode,
-              patch_size=patch_size, suffix=suffix)
+model.upscale(path, save_intermediate=save, mode=mode, patch_size=patch_size, suffix=suffix)

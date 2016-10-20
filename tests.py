@@ -65,16 +65,16 @@ if __name__ == "__main__":
     Train Res Net SR
     """
 
-    rnsr = models.ResNetSR(scale)
-    rnsr.create_model(load_weights=False, batch_size=1)
-    rnsr.fit(nb_epochs=150)
+    # rnsr = models.ResNetSR(scale)
+    # rnsr.create_model()
+    # rnsr.fit(nb_epochs=150)
 
     """
     Evaluate Super Resolution on Set5/14
     """
 
-    # sr = models.ImageSuperResolutionModel()
-    # sr.evaluate(val_path, scale_factor=scale)
+    # sr = models.ImageSuperResolutionModel(scale)
+    # sr.evaluate(val_path)
 
     """
     Evaluate ESRCNN on Set5/14
@@ -103,8 +103,8 @@ if __name__ == "__main__":
     Evaluate ResNetSR on Set5/14
     """
 
-    rnsr = models.ResNetSR(scale)
-    rnsr.evaluate(val_path)
+    # rnsr = models.ResNetSR(scale)
+    # rnsr.evaluate(val_path)
 
     """
     Compare output images of sr, esr, dsr and ddsr models
