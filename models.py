@@ -1,13 +1,13 @@
 from __future__ import print_function, division
 
 from keras.models import Model
-from keras.layers import Input, merge, BatchNormalization, Activation
+from keras.layers import Input, merge, BatchNormalization, Activation, Lambda
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D
 from keras import backend as K
 import keras.callbacks as callbacks
 import keras.optimizers as optimizers
 
-from advanced import HistoryCheckpoint
+from advanced import HistoryCheckpoint, depth_to_scale
 import img_utils
 
 import numpy as np
@@ -672,8 +672,6 @@ class ResNetSR(BaseSuperResolutionModel):
     def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ResNetSR History.txt"):
         super(ResNetSR, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
-        self.model.save_weights("weights/ResNetSR Full.h5")
-
 
 class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
 
@@ -687,6 +685,11 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
         self.f2 = 3
         self.f3 = 3
 
+        self.weight_path = "weights/ESPCNN Weights %d.h5" % scale_factor
+
+        # Setting up the number of channels in the final subpixel convolution layer
+        self.sub_pixel_channels = self.scale_factor ** 2
+
         # Flag to denote that this is a "true" upsampling model.
         # Image size will be multiplied by scale factor to get output image size
         self.true_upsampling = True
@@ -696,4 +699,27 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
         init = super(EfficientSubPixelConvolutionalSR, self).create_model(height, width, channels,
                                                                           load_weights, batch_size)
 
+        self.sub_pixel_channels = self.sub_pixel_channels * channels
 
+        if K.image_dim_ordering() == "th":
+            output_shape = (3, width * self.scale_factor, height * self.scale_factor)
+        else:
+            output_shape = (width * self.scale_factor, height * self.scale_factor, 3)
+
+        x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
+        x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
+
+        x = Convolution2D(self.sub_pixel_channels, self.f3, self.f3, border_mode='same', name='conv_output')(x)
+        out = Lambda(lambda x: depth_to_scale(x, self.scale_factor), output_shape=output_shape)(x)
+
+        model = Model(init, out)
+
+        adam = optimizers.Adam(lr=1e-3)
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        if load_weights: model.load_weights(self.weight_path)
+
+        self.model = model
+        return model
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ESPCNN History.txt"):
+        super(EfficientSubPixelConvolutionalSR, self).fit(batch_size, nb_epochs, save_history, history_fn)

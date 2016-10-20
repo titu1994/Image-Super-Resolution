@@ -70,6 +70,14 @@ if __name__ == "__main__":
     # rnsr.fit(nb_epochs=150)
 
     """
+    Train ESPCNN SR
+    """
+
+    # espcnn = models.EfficientSubPixelConvolutionalSR(scale)
+    # espcnn.create_model()
+    # espcnn.fit(nb_epochs=2)
+
+    """
     Evaluate Super Resolution on Set5/14
     """
 
@@ -105,6 +113,13 @@ if __name__ == "__main__":
 
     # rnsr = models.ResNetSR(scale)
     # rnsr.evaluate(val_path)
+
+    """
+    Evaluate ESPCNN SR on Set 5/14
+    """
+
+    # espcnn = models.EfficientSubPixelConvolutionalSR(scale)
+    # espcnn.evaluate(val_path)
 
     """
     Compare output images of sr, esr, dsr and ddsr models

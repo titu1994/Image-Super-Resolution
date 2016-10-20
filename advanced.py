@@ -1,5 +1,5 @@
 from keras.callbacks import Callback
-from keras.regularizers import ActivityRegularizer
+from keras.engine.topology import Layer
 from keras import backend as K
 
 ''' Callbacks '''
@@ -55,7 +55,7 @@ def depth_to_scale(x, scale, dim_ordering=K.image_dim_ordering(), name=None):
 
     b, k, r, c = x.shape
 
-    out = K.zeros((b, k / (scale * scale), r * scale, c * scale))
+    out = T.zeros((b, k // (scale * scale), r * scale, c * scale))
 
     for i in range(scale):
         for j in range(scale):
@@ -66,3 +66,25 @@ def depth_to_scale(x, scale, dim_ordering=K.image_dim_ordering(), name=None):
         out = out.transpose((0, 2, 3, 1))
 
     return out
+
+
+class SubpixelConvolution2D(Layer):
+
+    def __init__(self, r):
+        super(SubpixelConvolution2D, self).__init__()
+        self.r = r
+
+    def build(self, input_shape):
+        pass
+
+    def call(self, x, mask=None):
+        x = depth_to_scale(x, self.r)
+        return x
+
+    def get_output_shape_for(self, input_shape):
+        if K.image_dim_ordering() == "th":
+            b, k, r, c = input_shape
+            return (b, k / (self.r * self.r), r * self.r, c * self.r)
+        else:
+            b, r, c, k = input_shape
+            return (b, r * self.r, c * self.r, k / (self.r * self.r))

@@ -41,7 +41,11 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
 
     # For each image in input_images directory
     nb_images = len([name for name in os.listdir(directory)])
-    print("Transforming %d images." % (nb_images))
+
+    if max_nb_images != -1:
+        print("Transforming %d images." % max_nb_images)
+    else:
+        print("Transforming %d images." % (nb_images))
 
     if nb_images == 0:
         print("Extract the training images or images from imageset_91.zip (found in the releases of the project) "
@@ -206,6 +210,7 @@ if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images
     scaling_factor = 2
 
-    #transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1)
-    transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
+    ms_coco = "D:/Yue/Documents/Dataset/coco2014/train2014/train2014/"
+    transform_images(ms_coco, output_path, scaling_factor=scaling_factor, max_nb_images=5000)
+    #transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
     pass
