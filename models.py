@@ -119,7 +119,6 @@ class BaseSuperResolutionModel(object):
         :param suffix: suffix of upscaled image
         :param patch_size: size of each patch grid
         :param verbose: whether to print messages
-        :param evaluate: evaluate the upscaled image on the original image.
         :param mode: mode of upscaling. Can be "patch" or "fast"
         """
         import os
@@ -699,18 +698,18 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
         init = super(EfficientSubPixelConvolutionalSR, self).create_model(height, width, channels,
                                                                           load_weights, batch_size)
 
-        self.sub_pixel_channels = self.sub_pixel_channels * channels
+        self.sub_pixel_channels *= channels
 
         if K.image_dim_ordering() == "th":
-            output_shape = (3, width * self.scale_factor, height * self.scale_factor)
+            output_shape = (channels, width * self.scale_factor, height * self.scale_factor)
         else:
-            output_shape = (width * self.scale_factor, height * self.scale_factor, 3)
+            output_shape = (width * self.scale_factor, height * self.scale_factor, channels)
 
         x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
         x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
 
         x = Convolution2D(self.sub_pixel_channels, self.f3, self.f3, border_mode='same', name='conv_output')(x)
-        out = Lambda(lambda x: depth_to_scale(x, self.scale_factor), output_shape=output_shape)(x)
+        out = Lambda(lambda x: depth_to_scale(x, self.scale_factor, channels), output_shape=output_shape)(x)
 
         model = Model(init, out)
 

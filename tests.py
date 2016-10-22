@@ -73,9 +73,9 @@ if __name__ == "__main__":
     Train ESPCNN SR
     """
 
-    # espcnn = models.EfficientSubPixelConvolutionalSR(scale)
-    # espcnn.create_model()
-    # espcnn.fit(nb_epochs=2)
+    espcnn = models.EfficientSubPixelConvolutionalSR(scale)
+    espcnn.create_model()
+    espcnn.fit(nb_epochs=200)
 
     """
     Evaluate Super Resolution on Set5/14

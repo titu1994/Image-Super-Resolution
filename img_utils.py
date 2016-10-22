@@ -45,6 +45,7 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
     if max_nb_images != -1:
         print("Transforming %d images." % max_nb_images)
     else:
+        assert max_nb_images <= nb_images, "Max number of images must be less than number of images in path"
         print("Transforming %d images." % (nb_images))
 
     if nb_images == 0:
@@ -145,9 +146,21 @@ def block_view(A, block):
 def image_generator(directory, scale_factor=2, target_shape=None, small_train_images=False , shuffle=True,
                     batch_size=32, seed=None):
     if not target_shape:
-        image_shape = (3, 16 * scale_factor, 16 * scale_factor)
+        if small_train_images:
+            image_shape = (3, 16, 16)
+            y_image_shape = (3, 16 * scale_factor, 16 * scale_factor)
+        else:
+            image_shape = (3, 16 * scale_factor, 16 * scale_factor)
+            y_image_shape = image_shape
     else:
-        image_shape = (3,) + target_shape
+        if small_train_images:
+            y_image_shape = (3,) + target_shape
+
+            target_shape = (target_shape[0] // scale_factor, target_shape[1] // scale_factor)
+            image_shape = (3,) + target_shape
+        else:
+            image_shape = (3,) + target_shape
+            y_image_shape = image_shape
 
     file_names = [f for f in sorted(os.listdir(directory + "X/"))]
     X_filenames = [os.path.join(directory, "X", f) for f in file_names]
@@ -162,7 +175,7 @@ def image_generator(directory, scale_factor=2, target_shape=None, small_train_im
         index_array, current_index, current_batch_size = next(index_generator)
 
         batch_x = np.zeros((current_batch_size,) + image_shape)
-        batch_y = np.zeros((current_batch_size,) + image_shape)
+        batch_y = np.zeros((current_batch_size,) + y_image_shape)
 
         for i, j in enumerate(index_array):
             x_fn = X_filenames[j]
@@ -210,7 +223,6 @@ if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images
     scaling_factor = 2
 
-    ms_coco = "D:/Yue/Documents/Dataset/coco2014/train2014/train2014/"
-    transform_images(ms_coco, output_path, scaling_factor=scaling_factor, max_nb_images=5000)
-    #transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
+    transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1)
+    transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
     pass
