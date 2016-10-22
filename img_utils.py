@@ -9,6 +9,14 @@ from scipy.ndimage.filters import gaussian_filter
 import os
 import time
 
+'''
+_image_scale_multiplier is a special variable which is used to alter image size.
+
+The default image size is 32x32. If a true upscaling model is used, then the input image size is 16x16,
+which not offer adequate training samples.
+'''
+_image_scale_multiplier = 1
+
 img_size = 256
 stride = 16
 
@@ -30,7 +38,8 @@ validation_output_path = base_dataset_dir + r"train_images/validation/"
 if not os.path.exists(output_path):
     os.makedirs(output_path)
 
-def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1, val_imgs=False):
+def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1, val_imgs=False,
+                     true_upscale=False):
     index = 1
 
     if not os.path.exists(output_directory + "X/"):
@@ -62,7 +71,7 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
         img = imresize(img, (img_size, img_size))
 
         # Create patches
-        hr_patch_size = (16 * scaling_factor)
+        hr_patch_size = (16 * scaling_factor * _image_scale_multiplier)
         nb_hr_images = (img_size ** 2) // (stride ** 2)
 
         hr_samples = np.empty((nb_hr_images, hr_patch_size, hr_patch_size, 3))
@@ -77,7 +86,7 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
                 hr_samples[i, :, :, :] = next(image_subsample_iterator)
                 i += 1
 
-        lr_patch_size = 16
+        lr_patch_size = 16 * _image_scale_multiplier
 
         t1 = time.time()
         # Create nb_hr_images 'X' and 'Y' sub-images of size hr_patch_size for each patch
@@ -92,8 +101,9 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
             # Subsample by scaling factor to Y
             op = imresize(op, (lr_patch_size, lr_patch_size), interp='bicubic')
 
-            # Upscale by scaling factor to Y
-            op = imresize(op, (hr_patch_size, hr_patch_size), interp='bicubic')
+            if not true_upscale:
+                # Upscale by scaling factor to Y
+                op = imresize(op, (hr_patch_size, hr_patch_size), interp='bicubic')
 
             # Save Y
             imsave(output_directory + "/X/" + "%d_%d.png" % (index, i+1), op)
@@ -138,25 +148,22 @@ def combine_patches(in_patches, out_shape, scale):
     recon = reconstruct_from_patches_2d(in_patches, out_shape)
     return recon
 
-def block_view(A, block):
-    shape= (A.shape[0] / block[0], A.shape[1] / block[1], A.shape[2] / block[2]) + block
-    strides= (block[0] * A.strides[0], block[1] * A.strides[1], block[2] * A.strides[2])+ A.strides
-    return as_strided(A, shape= shape, strides= strides)
-
 def image_generator(directory, scale_factor=2, target_shape=None, small_train_images=False , shuffle=True,
                     batch_size=32, seed=None):
     if not target_shape:
         if small_train_images:
-            image_shape = (3, 16, 16)
-            y_image_shape = (3, 16 * scale_factor, 16 * scale_factor)
+            image_shape = (3, 16 * _image_scale_multiplier, 16 * _image_scale_multiplier)
+            y_image_shape = (3, 16 * scale_factor * _image_scale_multiplier,
+                             16 * scale_factor * _image_scale_multiplier)
         else:
-            image_shape = (3, 16 * scale_factor, 16 * scale_factor)
+            image_shape = (3, 16 * scale_factor * _image_scale_multiplier, 16 * scale_factor * _image_scale_multiplier)
             y_image_shape = image_shape
     else:
         if small_train_images:
             y_image_shape = (3,) + target_shape
 
-            target_shape = (target_shape[0] // scale_factor, target_shape[1] // scale_factor)
+            target_shape = (target_shape[0] * _image_scale_multiplier // scale_factor,
+                            target_shape[1] * _image_scale_multiplier // scale_factor)
             image_shape = (3,) + target_shape
         else:
             image_shape = (3,) + target_shape
@@ -181,7 +188,7 @@ def image_generator(directory, scale_factor=2, target_shape=None, small_train_im
             x_fn = X_filenames[j]
             img = imread(x_fn, mode='RGB')
             if small_train_images:
-                img = imresize(img, (16, 16))
+                img = imresize(img, (16 * _image_scale_multiplier, 16 * _image_scale_multiplier))
             img = img.astype('float32') / 255.
             batch_x[i] = img.transpose((2, 0, 1))
 
@@ -222,7 +229,10 @@ def _index_generator(N, batch_size=32, shuffle=True, seed=None):
 if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images
     scaling_factor = 2
+    true_upscale = True
 
-    transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1)
-    transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1)
+    transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1,
+                     true_upscale=true_upscale)
+    transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1,
+                     true_upscale=true_upscale)
     pass

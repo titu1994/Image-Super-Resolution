@@ -62,13 +62,13 @@ class BaseSuperResolutionModel(object):
         Subclass dependent implementation.
         """
         if self.model_name in self.auto_encoder_models:
-            assert height % 4 == 0, "Height of the image must be divisible by 4"
-            assert width % 4 == 0, "Width of the image must be divisible by 4"
+            assert height * img_utils._image_scale_multiplier % 4 == 0, "Height of the image must be divisible by 4"
+            assert width * img_utils._image_scale_multiplier % 4 == 0, "Width of the image must be divisible by 4"
 
         if K.image_dim_ordering() == "th":
-            shape = (channels, width, height)
+            shape = (channels, width * img_utils._image_scale_multiplier, height * img_utils._image_scale_multiplier)
         else:
-            shape = (width, height, channels)
+            shape = (width * img_utils._image_scale_multiplier, height * img_utils._image_scale_multiplier, channels)
 
         init = Input(shape=shape)
 
@@ -701,9 +701,11 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
         self.sub_pixel_channels *= channels
 
         if K.image_dim_ordering() == "th":
-            output_shape = (channels, width * self.scale_factor, height * self.scale_factor)
+            output_shape = (channels, width * self.scale_factor * img_utils._image_scale_multiplier,
+                            height * self.scale_factor * img_utils._image_scale_multiplier)
         else:
-            output_shape = (width * self.scale_factor, height * self.scale_factor, channels)
+            output_shape = (width * self.scale_factor * img_utils._image_scale_multiplier,
+                            height * self.scale_factor * img_utils._image_scale_multiplier, channels)
 
         x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
         x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
