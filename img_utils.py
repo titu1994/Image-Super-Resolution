@@ -15,10 +15,10 @@ _image_scale_multiplier is a special variable which is used to alter image size.
 The default image size is 32x32. If a true upscaling model is used, then the input image size is 16x16,
 which not offer adequate training samples.
 '''
-_image_scale_multiplier = 1
+_image_scale_multiplier = 2
 
-img_size = 256
-stride = 16
+img_size = 256 * _image_scale_multiplier
+stride = 16 * _image_scale_multiplier
 
 assert (img_size ** 2) % (stride ** 2) == 0, "Number of images generated from strided subsample of the image needs to be \n" \
                                              "a positive integer. Change stride such that : \n" \
