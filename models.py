@@ -51,8 +51,8 @@ class BaseSuperResolutionModel(object):
         self.scale_factor = scale_factor
         self.weight_path = None
 
-        self.auto_encoder_models = []
-        self.true_upsampling = False
+        self.type_requires_divisible_shape = False
+        self.type_true_upscaling = False
 
         self.evaluation_func = None
         self.uses_learning_phase = False
@@ -61,7 +61,7 @@ class BaseSuperResolutionModel(object):
         """
         Subclass dependent implementation.
         """
-        if self.model_name in self.auto_encoder_models:
+        if self.type_requires_divisible_shape:
             assert height * img_utils._image_scale_multiplier % 4 == 0, "Height of the image must be divisible by 4"
             assert width * img_utils._image_scale_multiplier % 4 == 0, "Width of the image must be divisible by 4"
 
@@ -89,20 +89,20 @@ class BaseSuperResolutionModel(object):
 
         print("Training model : %s" % (self.__class__.__name__))
         self.model.fit_generator(img_utils.image_generator(train_path, scale_factor=self.scale_factor,
-                                                           small_train_images=self.true_upsampling,
+                                                           small_train_images=self.type_true_upscaling,
                                                            batch_size=batch_size),
                                  samples_per_epoch=samples_per_epoch,
                                  nb_epoch=nb_epochs, callbacks=callback_list,
                                  validation_data=img_utils.image_generator(validation_path,
-                                                                          scale_factor=self.scale_factor,
-                                                                          small_train_images=self.true_upsampling,
-                                                                          batch_size=batch_size),
+                                                                           scale_factor=self.scale_factor,
+                                                                           small_train_images=self.type_true_upscaling,
+                                                                           batch_size=batch_size),
                                  nb_val_samples=val_count)
 
         return self.model
 
     def evaluate(self, validation_dir):
-        if self.model_name in self.auto_encoder_models:
+        if self.type_requires_divisible_shape:
             _evaluate_denoise(self, validation_dir)
         else:
             _evaluate(self, validation_dir)
@@ -137,14 +137,14 @@ class BaseSuperResolutionModel(object):
 
         img_height, img_width = 0, 0
 
-        if mode == "patch" and self.true_upsampling:
+        if mode == "patch" and self.type_true_upscaling:
             # Overriding mode for True Upscaling models
             mode = 'fast'
             print("Patch mode does not work with True Upscaling models yet. Defaulting to mode='fast'")
 
         if mode == 'patch':
             # Create patches
-            if self.model_name in self.auto_encoder_models:
+            if self.type_requires_divisible_shape:
                 if patch_size % 4 != 0:
                     print("Deep Denoise requires patch size which is multiple of 4.\nSetting patch_size = 8.")
                     patch_size = 8
@@ -210,8 +210,8 @@ class BaseSuperResolutionModel(object):
         imsave(filename, result)
 
     def __match_autoencoder_size(self, img_height, img_width, init_height, init_width, scale_factor):
-        if self.model_name in self.auto_encoder_models:
-            if not self.true_upsampling:
+        if self.type_requires_divisible_shape:
+            if not self.type_true_upscaling:
                 # AE model but not true upsampling
                 if ((init_height * scale_factor) % 4 != 0) or ((init_width * scale_factor) % 4 != 0) or \
                         (init_height % 2 != 0) or (init_width % 2 != 0):
@@ -237,7 +237,7 @@ class BaseSuperResolutionModel(object):
                     img_height, img_width = init_height, init_width
         else:
             # Not AE but true upsampling
-            if self.true_upsampling:
+            if self.type_true_upscaling:
                 img_height, img_width = init_height, init_width
             else:
                 # Not AE and not true upsampling
@@ -279,7 +279,7 @@ def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir):
             y = img_utils.imread(val_dir + impath, mode='RGB')
             width, height, _ = y.shape
 
-            if sr_model.model_name in sr_model.auto_encoder_models:
+            if sr_model.type_requires_divisible_shape:
                 # Denoise models require precise width and height, divisible by 4
 
                 if ((width // sr_model.scale_factor) % 4 != 0) or ((height // sr_model.scale_factor) % 4 != 0) \
@@ -295,14 +295,14 @@ def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir):
             y = y.astype('float32') / 255.
             y = np.expand_dims(y, axis=0)
 
-            x_width = width if not sr_model.true_upsampling else width // sr_model.scale_factor
-            x_height = height if not sr_model.true_upsampling else height // sr_model.scale_factor
+            x_width = width if not sr_model.type_true_upscaling else width // sr_model.scale_factor
+            x_height = height if not sr_model.type_true_upscaling else height // sr_model.scale_factor
 
             x_temp = y.copy()
             img = img_utils.imresize(x_temp[0], (x_width // sr_model.scale_factor, x_height // sr_model.scale_factor),
                                      interp='bicubic')
 
-            if not sr_model.true_upsampling:
+            if not sr_model.type_true_upscaling:
                 img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
 
             x = np.expand_dims(img, axis=0)
@@ -374,7 +374,7 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir):
             img = img_utils.imresize(x_temp[0], (width // sr_model.scale_factor, height // sr_model.scale_factor),
                                      interp='bicubic')
 
-            if not sr_model.true_upsampling:
+            if not sr_model.type_true_upscaling:
                 img = img_utils.imresize(img, (width, height), interp='bicubic')
 
             x = np.expand_dims(img, axis=0)
@@ -551,7 +551,7 @@ class DeepDenoiseSR(BaseSuperResolutionModel):
 
         # Treat this model as a denoising auto encoder
         # Force the fit, evaluate and upscale methods to take special care about image shape
-        self.auto_encoder_models.append(self.model_name)
+        self.type_requires_divisible_shape = True
 
         self.n1 = 64
         self.n2 = 128
@@ -608,7 +608,8 @@ class ResNetSR(BaseSuperResolutionModel):
 
         # Treat this model as a denoising auto encoder
         # Force the fit, evaluate and upscale methods to take special care about image shape
-        self.auto_encoder_models.append(self.model_name)
+        self.type_requires_divisible_shape = True
+
         self.uses_learning_phase = True
 
         self.n = 64
