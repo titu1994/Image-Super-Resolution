@@ -72,7 +72,6 @@ def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_dim_ordering(), 
                 b = j // scale #T.floor(j / scale).astype('int32')
                 d = channel * scale * (j % scale) + channel * (i % scale)
 
-                print(channel, i, j, a, b, d)
                 T.set_subtensor(out[:, channel - 1, i, j], x[:, d, a, b], inplace=True)
 
     if dim_ordering == 'tf':
@@ -96,7 +95,7 @@ class SubpixelConvolution2D(Layer):
         pass
 
     def call(self, x, mask=None):
-        x = depth_to_scale(x, self.r)
+        x = depth_to_scale(x, self.r, )
         return x
 
     def get_output_shape_for(self, input_shape):
