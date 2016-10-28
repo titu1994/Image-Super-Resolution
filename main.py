@@ -48,3 +48,35 @@ else:
     model = models.DeepDenoiseSR(scale_factor)
 
 model.upscale(path, save_intermediate=save, mode=mode, patch_size=patch_size, suffix=suffix)
+
+
+'''
+
+
+import theano.tensor as T
+
+    scale = int(scale)
+
+    if dim_ordering == "th":
+        x = x.transpose((0, 2, 3, 1)) # batch, width, height, channels
+
+    b, r, c, k = x.shape
+    out_b, out_k, out_r, out_c = b, k // (scale * scale), r * scale, c * scale
+
+    out = T.zeros((out_b, out_r, out_c, out_k), dtype='float32')
+
+    for i in range(out_r):
+        for j in range(out_c):
+            for channel in range(channels):
+                channel += 1
+                a = T.floor(i / scale).astype('int32')
+                b = T.floor(j / scale).astype('int32')
+                d = channel * scale * (j % scale) + channel * (i % scale)
+
+                out = T.set_subtensor(out[:, i, j, channel - 1], x[:, a, b, d])
+
+    if dim_ordering == 'th':
+        out = out.transpose((0, 3, 1, 2))
+
+    return out
+'''

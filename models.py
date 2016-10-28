@@ -711,7 +711,7 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
         x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
 
         x = Convolution2D(self.sub_pixel_channels, self.f3, self.f3, border_mode='same', name='conv_output')(x)
-        out = Lambda(lambda x: depth_to_scale(x, self.scale_factor, channels), output_shape=output_shape)(x)
+        out = Lambda(lambda x: depth_to_scale(x, self.scale_factor, output_shape), output_shape=output_shape)(x)
 
         model = Model(init, out)
 

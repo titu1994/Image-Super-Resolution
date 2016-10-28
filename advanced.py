@@ -45,7 +45,7 @@ class HistoryCheckpoint(Callback):
 
 ''' Theano Backend function '''
 
-def depth_to_scale(x, scale, channels=3, dim_ordering=K.image_dim_ordering(), name=None):
+def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_dim_ordering(), name=None):
     ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
 
     import theano.tensor as T
@@ -54,20 +54,25 @@ def depth_to_scale(x, scale, channels=3, dim_ordering=K.image_dim_ordering(), na
 
     if dim_ordering == "tf":
         x = x.transpose((0, 3, 1, 2))
+        out_row, out_col, out_channels = output_shape
+    else:
+        out_channels, out_row, out_col = output_shape
 
     b, k, r, c = x.shape
     out_b, out_k, out_r, out_c = b, k // (scale * scale), r * scale, c * scale
 
     out = K.reshape(x, (out_b, out_k, out_r, out_c))
 
-    for channel in range(channels):
-        for i in range(scale):
-            for j in range(scale):
-                channel += 1
-                a = T.floor(i / scale).astype('int32')
-                b = T.floor(j / scale).astype('int32')
+    for channel in range(out_channels):
+        channel += 1
+
+        for i in range(out_row):
+            for j in range(out_col):
+                a = i // scale #T.floor(i / scale).astype('int32')
+                b = j // scale #T.floor(j / scale).astype('int32')
                 d = channel * scale * (j % scale) + channel * (i % scale)
 
+                print(channel, i, j, a, b, d)
                 T.set_subtensor(out[:, channel - 1, i, j], x[:, d, a, b], inplace=True)
 
     if dim_ordering == 'tf':

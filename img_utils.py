@@ -15,7 +15,7 @@ _image_scale_multiplier is a special variable which is used to alter image size.
 The default image size is 32x32. If a true upscaling model is used, then the input image size is 16x16,
 which not offer adequate training samples.
 '''
-_image_scale_multiplier = 2
+_image_scale_multiplier = 1
 
 img_size = 256 * _image_scale_multiplier
 stride = 16 * _image_scale_multiplier
@@ -96,7 +96,7 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
             imsave(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
 
             # Apply Gaussian Blur to Y
-            op = gaussian_filter(ip, sigma=0.1)
+            op = gaussian_filter(ip, sigma=1.0)
 
             # Subsample by scaling factor to Y
             op = imresize(op, (lr_patch_size, lr_patch_size), interp='bicubic')
