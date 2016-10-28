@@ -76,6 +76,11 @@ def depth_to_scale(x, scale, channels=3, dim_ordering=K.image_dim_ordering(), na
     return out
 
 
+'''
+Implementation is incomplete. Use lambda layer for now.
+'''
+
+# TODO: Complete SubpixelConvolution2D layer implementation
 class SubpixelConvolution2D(Layer):
 
     def __init__(self, r):
