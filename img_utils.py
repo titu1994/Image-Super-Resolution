@@ -38,8 +38,7 @@ validation_output_path = base_dataset_dir + r"train_images/validation/"
 if not os.path.exists(output_path):
     os.makedirs(output_path)
 
-def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1, val_imgs=False,
-                     true_upscale=False):
+def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1, true_upscale=False):
     index = 1
 
     if not os.path.exists(output_directory + "X/"):
