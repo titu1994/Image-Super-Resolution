@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 
 from keras.models import Model
-from keras.layers import Input, merge, BatchNormalization, Activation, Lambda
+from keras.layers import Input, merge, BatchNormalization, Activation
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D
 from keras import backend as K
 import keras.callbacks as callbacks
@@ -107,7 +107,7 @@ class BaseSuperResolutionModel(object):
         else:
             _evaluate(self, validation_dir)
 
-    
+
     def upscale(self, img_path, save_intermediate=False, return_image=False, suffix="scaled",
                 patch_size=8, mode="patch", verbose=True):
         """
@@ -413,7 +413,6 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir):
             img_utils.imsave(generated_path, y_pred)
 
         print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
-
 
 
 class ImageSuperResolutionModel(BaseSuperResolutionModel):

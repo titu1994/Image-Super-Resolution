@@ -95,7 +95,7 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
             imsave(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
 
             # Apply Gaussian Blur to Y
-            op = gaussian_filter(ip, sigma=1.0)
+            op = gaussian_filter(ip, sigma=0.5)
 
             # Subsample by scaling factor to Y
             op = imresize(op, (lr_patch_size, lr_patch_size), interp='bicubic')

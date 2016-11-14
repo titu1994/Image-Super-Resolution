@@ -65,9 +65,9 @@ if __name__ == "__main__":
     Train Res Net SR
     """
 
-    rnsr = models.ResNetSR(scale)
-    rnsr.create_model()
-    rnsr.fit(nb_epochs=150)
+    # rnsr = models.ResNetSR(scale)
+    # rnsr.create_model()
+    # rnsr.fit(nb_epochs=150)
 
     """
     Train ESPCNN SR
