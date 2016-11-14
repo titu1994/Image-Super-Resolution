@@ -609,10 +609,10 @@ class ResNetSR(BaseSuperResolutionModel):
         # Treat this model as a denoising auto encoder
         # Force the fit, evaluate and upscale methods to take special care about image shape
         self.type_requires_divisible_shape = True
-        self.uses_learning_phase = True
+        self.uses_learning_phase = False
 
         self.n = 64
-        self.mode = 0
+        self.mode = 2
 
         self.weight_path = "weights/ResNetSR %dX.h5" % (self.scale_factor)
 
