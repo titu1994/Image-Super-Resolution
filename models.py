@@ -669,7 +669,7 @@ class ResNetSR(BaseSuperResolutionModel):
 
         x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='sr_res_upconv1_%d' % id)(init)
         x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
-        x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='sr_res_filter1_%d' % id)(x)
+        x = Convolution2D(self.n, 3, 3, activation="relu", border_mode='same', name='sr_res_filter1_%d' % id)(x)
 
         return x
 
