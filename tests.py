@@ -65,17 +65,17 @@ if __name__ == "__main__":
     Train Res Net SR
     """
 
-    # rnsr = models.ResNetSR(scale)
-    # rnsr.create_model()
-    # rnsr.fit(nb_epochs=150)
+    rnsr = models.ResNetSR(scale)
+    rnsr.create_model()
+    rnsr.fit(nb_epochs=150)
 
     """
     Train ESPCNN SR
     """
 
-    espcnn = models.EfficientSubPixelConvolutionalSR(scale)
-    espcnn.create_model()
-    espcnn.fit(nb_epochs=50)
+    # espcnn = models.EfficientSubPixelConvolutionalSR(scale)
+    # espcnn.create_model()
+    # espcnn.fit(nb_epochs=50)
 
     """
     Evaluate Super Resolution on Set5/14
@@ -118,8 +118,8 @@ if __name__ == "__main__":
     Evaluate ESPCNN SR on Set 5/14
     """
 
-    espcnn = models.EfficientSubPixelConvolutionalSR(scale)
-    espcnn.evaluate(val_path)
+    # espcnn = models.EfficientSubPixelConvolutionalSR(scale)
+    # espcnn.evaluate(val_path)
 
     """
     Compare output images of sr, esr, dsr and ddsr models

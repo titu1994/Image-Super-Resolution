@@ -7,7 +7,7 @@ from keras import backend as K
 import keras.callbacks as callbacks
 import keras.optimizers as optimizers
 
-from advanced import HistoryCheckpoint, depth_to_scale
+from advanced import HistoryCheckpoint, SubPixelUpscaling
 import img_utils
 
 import numpy as np
@@ -631,14 +631,10 @@ class ResNetSR(BaseSuperResolutionModel):
         for i in range(nb_residual):
             x = self._residual_block(x, i + 2)
 
-        x = UpSampling2D()(x)
-        x = Convolution2D(64, 3, 3, activation='relu', border_mode='same', name='sr_res_deconv1',)(x)
-
+        x = self._upscale_block(x, 1)
         x = merge([x, x1], mode='sum')
 
-        x = UpSampling2D()(x)
-        x = Convolution2D(64, 3, 3, activation='relu', border_mode='same',  name='sr_res_deconv2')(x)
-
+        x = self._upscale_block(x, 2)
         x = merge([x, x0], mode='sum')
 
         x = Convolution2D(3, 3, 3, activation="linear", border_mode='same', name='sr_res_conv_final')(x)
@@ -668,6 +664,15 @@ class ResNetSR(BaseSuperResolutionModel):
 
         return m
 
+    def _upscale_block(self, ip, id):
+        init = ip
+
+        x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='sr_res_upconv1_%d' % id)(init)
+        x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
+        x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='sr_res_filter1_%d' % id)(x)
+
+        return x
+
     def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ResNetSR History.txt"):
         super(ResNetSR, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
@@ -686,9 +691,6 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
 
         self.weight_path = "weights/ESPCNN Weights %d.h5" % scale_factor
 
-        # Setting up the number of channels in the final subpixel convolution layer
-        self.sub_pixel_channels = self.scale_factor ** 2
-
         # Flag to denote that this is a "true" upsampling model.
         # Image size will be multiplied by scale factor to get output image size
         self.true_upsampling = True
@@ -698,20 +700,12 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
         init = super(EfficientSubPixelConvolutionalSR, self).create_model(height, width, channels,
                                                                           load_weights, batch_size)
 
-        self.sub_pixel_channels *= channels
-
-        if K.image_dim_ordering() == "th":
-            output_shape = (channels, width * self.scale_factor * img_utils._image_scale_multiplier,
-                            height * self.scale_factor * img_utils._image_scale_multiplier)
-        else:
-            output_shape = (width * self.scale_factor * img_utils._image_scale_multiplier,
-                            height * self.scale_factor * img_utils._image_scale_multiplier, channels)
-
         x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
         x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
 
-        x = Convolution2D(self.sub_pixel_channels, self.f3, self.f3, border_mode='same', name='conv_output')(x)
-        out = Lambda(lambda x: depth_to_scale(x, self.scale_factor, output_shape), output_shape=output_shape)(x)
+        x = self._upscale_block(x, 1)
+
+        out = Convolution2D(3, 5, 5, activation='linear', border_mode='same')(x)
 
         model = Model(init, out)
 
@@ -721,6 +715,15 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
 
         self.model = model
         return model
+
+    def _upscale_block(self, ip, id):
+        init = ip
+
+        x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='espcnn_upconv1_%d' % id)(init)
+        x = SubPixelUpscaling(r=2, channels=self.n1, name='espcnn_upconv1__upscale1_%d' % id)(x)
+        x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='espcnn_upconv1_filter1_%d' % id)(x)
+
+        return x
 
     def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ESPCNN History.txt"):
         super(EfficientSubPixelConvolutionalSR, self).fit(batch_size, nb_epochs, save_history, history_fn)

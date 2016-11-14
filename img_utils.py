@@ -227,8 +227,13 @@ def _index_generator(N, batch_size=32, shuffle=True, seed=None):
 
 if __name__ == "__main__":
     # Transform the images once, then run the main code to scale images
+
+    # Change scaling factor to increase the scaling factor
     scaling_factor = 2
-    true_upscale = True
+
+    # Set true_upscale to True to generate smaller training images that will then be true upscaled.
+    # Leave as false to create same size input and output images
+    true_upscale = False
 
     transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1,
                      true_upscale=true_upscale)
