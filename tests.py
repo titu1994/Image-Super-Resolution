@@ -111,8 +111,8 @@ if __name__ == "__main__":
     Evaluate ResNetSR on Set5/14
     """
 
-    rnsr = models.ResNetSR(scale)
-    rnsr.evaluate(val_path)
+    # rnsr = models.ResNetSR(scale)
+    # rnsr.evaluate(val_path)
 
     """
     Evaluate ESPCNN SR on Set 5/14
