@@ -1,10 +1,11 @@
-from __future__ import print_function, division
+from __future__ import print_function, division, absolute_import
 
 import numpy as np
-from numpy.lib.stride_tricks import as_strided
 from scipy.misc import imsave, imread, imresize
 from sklearn.feature_extraction.image import reconstruct_from_patches_2d, extract_patches_2d
 from scipy.ndimage.filters import gaussian_filter
+
+from keras import backend as K
 
 import os
 import time
@@ -147,26 +148,47 @@ def combine_patches(in_patches, out_shape, scale):
     recon = reconstruct_from_patches_2d(in_patches, out_shape)
     return recon
 
-def image_generator(directory, scale_factor=2, target_shape=None, small_train_images=False , shuffle=True,
+def image_generator(directory, scale_factor=2, target_shape=None, channels=3, small_train_images=False , shuffle=True,
                     batch_size=32, seed=None):
     if not target_shape:
         if small_train_images:
-            image_shape = (3, 16 * _image_scale_multiplier, 16 * _image_scale_multiplier)
-            y_image_shape = (3, 16 * scale_factor * _image_scale_multiplier,
-                             16 * scale_factor * _image_scale_multiplier)
+            if K.image_dim_ordering() == "th":
+                image_shape = (channels, 16 * _image_scale_multiplier, 16 * _image_scale_multiplier)
+                y_image_shape = (channels, 16 * scale_factor * _image_scale_multiplier,
+                                 16 * scale_factor * _image_scale_multiplier)
+            else:
+                image_shape = (16 * _image_scale_multiplier, 16 * _image_scale_multiplier, channels)
+                y_image_shape = (16 * scale_factor * _image_scale_multiplier,
+                                 16 * scale_factor * _image_scale_multiplier, channels)
         else:
-            image_shape = (3, 16 * scale_factor * _image_scale_multiplier, 16 * scale_factor * _image_scale_multiplier)
-            y_image_shape = image_shape
+            if K.image_dim_ordering() == "th":
+                image_shape = (channels, 16 * scale_factor * _image_scale_multiplier, 16 * scale_factor * _image_scale_multiplier)
+                y_image_shape = image_shape
+            else:
+                image_shape = (16 * scale_factor * _image_scale_multiplier, 16 * scale_factor * _image_scale_multiplier,
+                               channels)
+                y_image_shape = image_shape
     else:
         if small_train_images:
-            y_image_shape = (3,) + target_shape
+            if K.image_dim_ordering() == "th":
+                y_image_shape = (3,) + target_shape
 
-            target_shape = (target_shape[0] * _image_scale_multiplier // scale_factor,
-                            target_shape[1] * _image_scale_multiplier // scale_factor)
-            image_shape = (3,) + target_shape
+                target_shape = (target_shape[0] * _image_scale_multiplier // scale_factor,
+                                target_shape[1] * _image_scale_multiplier // scale_factor)
+                image_shape = (3,) + target_shape
+            else:
+                y_image_shape = target_shape + (channels,)
+
+                target_shape = (target_shape[0] * _image_scale_multiplier // scale_factor,
+                                target_shape[1] * _image_scale_multiplier // scale_factor)
+                image_shape = target_shape + (channels,)
         else:
-            image_shape = (3,) + target_shape
-            y_image_shape = image_shape
+            if K.image_dim_ordering() == "th":
+                image_shape = (channels,) + target_shape
+                y_image_shape = image_shape
+            else:
+                image_shape = target_shape + (channels,)
+                y_image_shape = image_shape
 
     file_names = [f for f in sorted(os.listdir(directory + "X/"))]
     X_filenames = [os.path.join(directory, "X", f) for f in file_names]
@@ -189,12 +211,20 @@ def image_generator(directory, scale_factor=2, target_shape=None, small_train_im
             if small_train_images:
                 img = imresize(img, (16 * _image_scale_multiplier, 16 * _image_scale_multiplier))
             img = img.astype('float32') / 255.
-            batch_x[i] = img.transpose((2, 0, 1))
+
+            if K.image_dim_ordering() == "th":
+                batch_x[i] = img.transpose((2, 0, 1))
+            else:
+                batch_x[i] = img
 
             y_fn = y_filenames[j]
             img = imread(y_fn, mode="RGB")
             img = img.astype('float32') / 255.
-            batch_y[i] = img.transpose((2, 0, 1))
+
+            if K.image_dim_ordering() == "th":
+                batch_y[i] = img.transpose((2, 0, 1))
+            else:
+                batch_y[i] = img
 
         yield (batch_x, batch_y)
 
