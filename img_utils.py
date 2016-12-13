@@ -148,7 +148,7 @@ def combine_patches(in_patches, out_shape, scale):
     recon = reconstruct_from_patches_2d(in_patches, out_shape)
     return recon
 
-def image_generator(directory, scale_factor=2, target_shape=None, channels=3, small_train_images=False , shuffle=True,
+def image_generator(directory, scale_factor=2, target_shape=None, channels=3, small_train_images=False, shuffle=True,
                     batch_size=32, seed=None):
     if not target_shape:
         if small_train_images:

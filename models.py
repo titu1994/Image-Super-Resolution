@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 
 from keras.models import Model
-from keras.layers import Input, merge, BatchNormalization, Activation
+from keras.layers import merge, Input, Dense, Flatten, BatchNormalization, Activation, LeakyReLU
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D
 from keras import backend as K
 import keras.callbacks as callbacks
@@ -246,7 +246,7 @@ class BaseSuperResolutionModel(object):
         return img_height, img_width
 
 
-def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir):
+def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=False):
     """
         Evaluates the model on the Validation images
         """
@@ -316,6 +316,8 @@ def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir):
             else:
                 y_pred = sr_model.evaluation_func([x])[0][0]
 
+            if scale_pred: y_pred *= 255.
+
             psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
             total_psnr += psnr_val
 
@@ -333,7 +335,7 @@ def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir):
         print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
 
 
-def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir):
+def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=False):
     print("Validating %s model" % sr_model.model_name)
     predict_path = "val_predict/"
     if not os.path.exists(predict_path):
@@ -397,6 +399,8 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir):
                 y_pred = sr_model.evaluation_func([x, 0])[0][0]
             else:
                 y_pred = sr_model.evaluation_func([x])[0][0]
+
+            if scale_pred: y_pred *= 255
 
             psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
             total_psnr += psnr_val
@@ -726,3 +730,246 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
 
     def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ESPCNN History.txt"):
         super(EfficientSubPixelConvolutionalSR, self).fit(batch_size, nb_epochs, save_history, history_fn)
+
+
+class GANImageSuperResolutionModel(BaseSuperResolutionModel):
+
+    def __init__(self, scale_factor):
+        super(GANImageSuperResolutionModel, self).__init__("GAN Image SR", scale_factor)
+
+        self.f1 = 9
+        self.f2 = 1
+        self.f3 = 5
+
+        self.n1 = 64
+        self.n2 = 32
+
+        self.gen_model = None # type: Model
+        self.disc_model = None # type: Model
+
+        self.weight_path = "weights/GAN SR Weights %dX.h5" % (self.scale_factor)
+        self.gen_weight_path = "weights/GAN SR Pretrain Weights %dX.h5" % (self.scale_factor)
+        self.disc_weight_path = "weights/GAN SR Discriminator Weights %dX.h5" % (self.scale_factor)
+
+
+    def create_model(self, mode='test', height=32, width=32, channels=3, load_weights=False, batch_size=128):
+        """
+            Creates a model to be used to scale images of specific height and width.
+        """
+        assert mode in ['test', 'train'], "'mode' must be either 'train' or 'test'"
+
+        channel_axis = 1 if K.image_dim_ordering() == 'th' else -1
+
+        gen_init = super(GANImageSuperResolutionModel, self).create_model(height, width, channels, load_weights, batch_size)
+
+        x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='gen_level1')(gen_init)
+        x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='gen_level2')(x)
+
+        out = Convolution2D(channels, self.f3, self.f3, activation='sigmoid', border_mode='same', name='gen_output')(x)
+
+        gen_model = Model(gen_init, out)
+
+        adam = optimizers.Adam(lr=1e-4)
+        gen_model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        if load_weights and mode == 'test': gen_model.load_weights(self.weight_path, by_name=True)
+
+        self.model = gen_model
+
+        if mode == 'train':
+            try:
+                gen_model.load_weights(self.weight_path)
+            except:
+                print('Could not load weights of GAN SR model for training.')
+
+        if mode == 'train':
+            disc_init = super(GANImageSuperResolutionModel, self).create_model(height, width, channels, load_weights, batch_size)
+
+            x = Convolution2D(64, 3, 3, border_mode='same', name='disc_level1_1')(disc_init)
+            x = LeakyReLU(alpha=0.25, name='disc_lr_1_1')(x)
+            x = Convolution2D(64, 3, 3, border_mode='same', name='disc_level1_2',
+                          subsample=(2, 2))(x)
+            x = LeakyReLU(alpha=0.25, name='disc_lr_1_2')(x)
+            x = BatchNormalization(mode=2, axis=channel_axis, name='disc_bn_1')(x)
+
+            x = Convolution2D(128, 3, 3, border_mode='same', name='disc_level2_1')(x)
+            x = LeakyReLU(alpha=0.25, name='disc_lr_2_1')(x)
+            x = Convolution2D(128, 3, 3, border_mode='same', name='disc_level2_2',
+                              subsample=(2, 2))(x)
+            x = LeakyReLU(alpha=0.25, name='disc_lr_2_2')(x)
+            x = BatchNormalization(mode=2, axis=channel_axis, name='disc_bn_2')(x)
+
+            x = Flatten(name='disc_flatten')(x)
+            x = Dense(128, name='disc_dense_1')(x)
+            x = LeakyReLU(alpha=0.25, name='disc_lr_final')(x)
+            out = Dense(1, activation='sigmoid', name='disc_output')(x)
+
+            disc_model = Model(disc_init, out)
+
+            adam = optimizers.Adam(lr=1e-3)
+            disc_model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['acc'])
+            if load_weights: disc_model.load_weights(self.disc_weight_path)
+
+            for layer in disc_model.layers:
+                layer.trainable = False
+
+            gen_out = gen_model(gen_init)
+            disc_out = disc_model(gen_out)
+
+            full_model = Model(input=gen_init, output=disc_out)
+
+            for layer in full_model.layers[2].layers:
+                layer.trainable = False
+
+            full_model.compile(optimizers.Adam(lr=1e-4), loss='binary_crossentropy', metrics=['acc'])
+
+            for layer in disc_model.layers:
+                layer.trainable = True
+
+            self.model = full_model
+            self.gen_model = gen_model
+            self.disc_model = disc_model
+
+            # Setup evaluation function for validation
+            self.evaluation_func = K.function([self.gen_model.layers[0].input],
+                                              [self.gen_model.layers[-1].output])
+
+        else:
+            self.model = gen_model
+
+        return self.model
+
+
+    def set_trainable(self, model, value, prefix='gen'):
+        for layer in model.layers:
+            if 'model' in layer.name:
+                model_index = -1
+
+                for deep_layer in model.layers[1].layers: # check generator layers
+                    if prefix in deep_layer.name:
+                        deep_layer.trainable = value
+                        model_index = 1
+
+                for deep_layer in model.layers[2].layers: # check discriminator layers
+                    if prefix in deep_layer.name:
+                        deep_layer.trainable = value
+                        model_index = 2
+
+                model.layers[model_index].trainable = value
+                break
+
+            elif prefix in layer.name: # discriminator model
+                layer.trainable = value
+
+
+    def fit(self, nb_pretrain_samples=5000, batch_size=128, nb_epochs=100, save_history=True, history_fn="GAN SRCNN History.txt"):
+        samples_per_epoch = img_utils.image_count()
+        meanaxis = (0, 2, 3) if K.image_dim_ordering() == 'th' else (0, 1, 2)
+
+        if self.model == None: self.create_model(mode='train', batch_size=batch_size)
+
+        if os.path.exists(self.gen_weight_path) and os.path.exists(self.disc_weight_path):
+            self.gen_model.load_weights(self.gen_weight_path)
+            self.disc_model.load_weights(self.disc_weight_path)
+            print("Pre-trained Generator and Discriminator network weights loaded")
+        else:
+            nb_train_samples = nb_pretrain_samples
+
+            print('Pre-training on %d images' % (nb_train_samples))
+            batchX, batchY = next(img_utils.image_generator(train_path, scale_factor=self.scale_factor,
+                                                       small_train_images=self.type_true_upscaling,
+                                                       batch_size=nb_train_samples))
+
+            print("Pre-training Generator network")
+            hist = self.gen_model.fit(batchX, batchY, batch_size, nb_epoch=100, verbose=2)
+            print("Generator pretrain final PSNR : ", hist.history['PSNRLoss'][-1])
+
+            print("Pre-training Discriminator network")
+
+            genX = self.gen_model.predict(batchX, batch_size=batch_size)
+
+            print('GenX Output mean (per channel) :', np.mean(genX, axis=meanaxis))
+            print('BatchX mean (per channel) :', np.mean(batchX, axis=meanaxis))
+
+            X = np.concatenate((genX, batchX))
+            y = [0] * nb_train_samples + [1] * nb_train_samples
+            y = np.asarray(y, dtype=np.float32).reshape(-1, 1)
+
+            hist = self.disc_model.fit(X, y, batch_size=batch_size * 2,
+                                       nb_epoch=1, verbose=0)
+
+            print('Discriminator History :', hist.history)
+            print()
+
+        self.gen_model.save_weights(self.gen_weight_path, overwrite=True)
+        self.disc_model.save_weights(self.disc_weight_path, overwrite=True)
+
+        iteration = 0
+        save_index = 1
+
+        print("Training full model : %s" % (self.__class__.__name__))
+
+        for i in range(nb_epochs):
+            print("Epoch : %d" % (i + 1))
+            print()
+
+            for x, y in img_utils.image_generator(train_path, scale_factor=self.scale_factor,
+                                                  small_train_images=self.type_true_upscaling,  batch_size=batch_size):
+                t1 = time.time()
+
+                X_pred = self.gen_model.predict(x, batch_size)
+
+                print("Input batchX mean (per channel) :", np.mean(x, axis=meanaxis))
+                print("X_pred mean (per channel) :", np.mean(X_pred, axis=meanaxis))
+
+                X = np.concatenate((X_pred, x))
+                y_disc = [0] * batch_size + [1] * batch_size
+                y_disc = np.asarray(y_disc, dtype=np.float32).reshape(-1, 1)
+
+                hist = self.disc_model.fit(X, y_disc, verbose=0, batch_size=batch_size, nb_epoch=1)
+
+                discriminator_loss = hist.history['loss'][0]
+                discriminator_acc = hist.history['acc'][0]
+
+                y_model = [1] * batch_size
+                y_model = np.asarray(y_model, dtype=np.float32).reshape(-1, 1)
+
+                hist = self.model.fit(x, y_model, batch_size, nb_epoch=1, verbose=0)
+                generative_loss = hist.history['loss'][0]
+
+                iteration += batch_size
+                save_index += 1
+
+                t2 = time.time()
+
+                print("Iter : %d / %d | Time required : %0.2f seconds | Discriminator Loss / Acc : %0.6f / %0.3f | "
+                      "Generative Loss : %0.6f" % (iteration, samples_per_epoch, t2 - t1,
+                                                   discriminator_loss, discriminator_acc, generative_loss))
+
+                # Validate at end of epoch
+                if iteration >= samples_per_epoch:
+                    print("Evaluating generator model...")
+                    # losses = self.gen_model.evaluate_generator(generator=img_utils.image_generator(train_path,
+                    #                                            scale_factor=self.scale_factor,
+                    #                                            small_train_images=self.type_true_upscaling,
+                    #                                            batch_size=batch_size),
+                    #                                            val_samples=samples_per_epoch)
+                    #
+                    # print('Generator Loss (PSNR):', losses[-1])
+
+                    self.evaluate('val_images/')
+
+                # Save weights every 100 iterations
+                if save_index % 100 == 0:
+                    print("Saving generator weights")
+                    self.gen_model.save_weights(self.weight_path, overwrite=True)
+
+                if iteration >= samples_per_epoch:
+                    break
+
+            iteration = 0
+            save_index = 1
+
+        return self.model
+
+    def evaluate(self, validation_dir):
+        _evaluate(self, validation_dir, scale_pred=True)

@@ -16,18 +16,21 @@ if __name__ == "__main__":
 
     # model = models.ImageSuperResolutionModel(scale).create_model()
     # plot(model, to_file="architectures/SRCNN.png", show_shapes=True, show_layer_names=True)
-    #
+
     # model = models.ExpantionSuperResolution(scale).create_model()
     # plot(model, to_file="architectures/ESRCNN.png", show_layer_names=True, show_shapes=True)
-    #
+
     # model = models.DenoisingAutoEncoderSR(scale).create_model()
     # plot(model, to_file="architectures/Denoise.png", show_layer_names=True, show_shapes=True)
-    #
+
     # model = models.DeepDenoiseSR(scale).create_model()
     # plot(model, to_file="architectures/Deep Denoise.png", show_layer_names=True, show_shapes=True)
-    #
+
     # model = models.ResNetSR(scale).create_model()
     # plot(model, to_file="architectures/ResNet.png", show_layer_names=True, show_shapes=True)
+
+    # model = models.GANImageSuperResolutionModel(scale).create_model(mode='train')
+    # plot(model, to_file='architectures/GAN Image SR.png', show_shapes=True, show_layer_names=True)
 
     """
     Train Super Resolution
@@ -78,6 +81,14 @@ if __name__ == "__main__":
     # espcnn.fit(nb_epochs=50)
 
     """
+    Train GAN Super Resolution
+    """
+
+    gsr = models.GANImageSuperResolutionModel(scale)
+    gsr.create_model(mode='train')
+    gsr.fit(nb_pretrain_samples=10000, nb_epochs=10)
+
+    """
     Evaluate Super Resolution on Set5/14
     """
 
@@ -120,6 +131,13 @@ if __name__ == "__main__":
 
     # espcnn = models.EfficientSubPixelConvolutionalSR(scale)
     # espcnn.evaluate(val_path)
+
+    """
+    Evaluate GAN Super Resolution on Set 5/14
+    """
+
+    gsr = models.GANImageSuperResolutionModel(scale)
+    gsr.evaluate(val_path)
 
     """
     Compare output images of sr, esr, dsr and ddsr models
