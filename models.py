@@ -4,6 +4,7 @@ from keras.models import Model
 from keras.layers import merge, Input, Dense, Flatten, BatchNormalization, Activation, LeakyReLU
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D
 from keras import backend as K
+from keras.utils.np_utils import to_categorical
 import keras.callbacks as callbacks
 import keras.optimizers as optimizers
 
@@ -51,6 +52,7 @@ class BaseSuperResolutionModel(object):
         self.scale_factor = scale_factor
         self.weight_path = None
 
+        self.type_scale_type = "norm" # Default = "norm" = 1. / 255
         self.type_requires_divisible_shape = False
         self.type_true_upscaling = False
 
@@ -292,18 +294,27 @@ def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=Fa
 
                     y = img_utils.imresize(y, (width, height), interp='bicubic')
 
-            y = y.astype('float32') / 255.
-            y = np.expand_dims(y, axis=0)
-
+            y = y.astype('float32')
             x_width = width if not sr_model.type_true_upscaling else width // sr_model.scale_factor
             x_height = height if not sr_model.type_true_upscaling else height // sr_model.scale_factor
 
             x_temp = y.copy()
-            img = img_utils.imresize(x_temp[0], (x_width // sr_model.scale_factor, x_height // sr_model.scale_factor),
+
+            if sr_model.type_scale_type == "tanh":
+                x_temp = (x_temp - 127.5) / 127.5
+                y = (y - 127.5) / 127.5
+            else:
+                x_temp /= 255.
+                y /= 255.
+
+            y = np.expand_dims(y, axis=0)
+
+            img = img_utils.imresize(x_temp, (x_width // sr_model.scale_factor, x_height // sr_model.scale_factor),
                                      interp='bicubic')
 
             if not sr_model.type_true_upscaling:
                 img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
+
 
             x = np.expand_dims(img, axis=0)
 
@@ -316,7 +327,14 @@ def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=Fa
             else:
                 y_pred = sr_model.evaluation_func([x])[0][0]
 
-            if scale_pred: y_pred *= 255.
+            if scale_pred:
+                if sr_model.type_scale_type == "tanh":
+                    y_pred = (y_pred + 1) * 127.5
+                else:
+                    y_pred *= 255.
+
+            if sr_model.type_scale_type == 'tanh':
+                y = (y + 1) / 2
 
             psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
             total_psnr += psnr_val
@@ -369,11 +387,19 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir, scale
 
                 y = img_utils.imresize(y, (width, height), interp='bicubic')
 
-            y = y.astype('float32') / 255.
+            y = y.astype('float32')
             y = np.expand_dims(y, axis=0)
 
             x_temp = y.copy()
-            img = img_utils.imresize(x_temp[0], (width // sr_model.scale_factor, height // sr_model.scale_factor),
+
+            if sr_model.type_scale_type == "tanh":
+                x_temp = (x_temp - 127.5) / 127.5
+                y = (y - 127.5) / 127.5
+            else:
+                x_temp /= 255.
+                y /= 255.
+
+            img = img_utils.imresize(x_temp, (width // sr_model.scale_factor, height // sr_model.scale_factor),
                                      interp='bicubic')
 
             if not sr_model.type_true_upscaling:
@@ -400,7 +426,14 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir, scale
             else:
                 y_pred = sr_model.evaluation_func([x])[0][0]
 
-            if scale_pred: y_pred *= 255
+            if scale_pred:
+                if sr_model.type_scale_type == "tanh":
+                    y_pred = (y_pred + 1) * 127.5
+                else:
+                    y_pred *= 255.
+
+            if sr_model.type_scale_type == 'tanh':
+                y = (y + 1) / 2
 
             psnr_val = psnr(y[0], np.clip(y_pred, 0, 255) / 255)
             total_psnr += psnr_val
@@ -747,6 +780,8 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
         self.gen_model = None # type: Model
         self.disc_model = None # type: Model
 
+        self.type_scale_type = 'tanh'
+
         self.weight_path = "weights/GAN SR Weights %dX.h5" % (self.scale_factor)
         self.gen_weight_path = "weights/GAN SR Pretrain Weights %dX.h5" % (self.scale_factor)
         self.disc_weight_path = "weights/GAN SR Discriminator Weights %dX.h5" % (self.scale_factor)
@@ -763,9 +798,11 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
         gen_init = super(GANImageSuperResolutionModel, self).create_model(height, width, channels, load_weights, batch_size)
 
         x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='gen_level1')(gen_init)
+        x = LeakyReLU(alpha=0.25)(x)
         x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='gen_level2')(x)
+        x = LeakyReLU(alpha=0.25)(x)
 
-        out = Convolution2D(channels, self.f3, self.f3, activation='sigmoid', border_mode='same', name='gen_output')(x)
+        out = Convolution2D(channels, self.f3, self.f3, activation='tanh', border_mode='same', name='gen_output')(x)
 
         gen_model = Model(gen_init, out)
 
@@ -801,7 +838,7 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
             x = Flatten(name='disc_flatten')(x)
             x = Dense(128, name='disc_dense_1')(x)
             x = LeakyReLU(alpha=0.25, name='disc_lr_final')(x)
-            out = Dense(1, activation='sigmoid', name='disc_output')(x)
+            out = Dense(2, activation='softmax', name='disc_output')(x)
 
             disc_model = Model(disc_init, out)
 
@@ -861,7 +898,8 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
                 layer.trainable = value
 
 
-    def fit(self, nb_pretrain_samples=5000, batch_size=128, nb_epochs=100, save_history=True, history_fn="GAN SRCNN History.txt"):
+    def fit(self, nb_pretrain_samples=5000, batch_size=128, nb_epochs=100, disc_train_flip=0.1,
+            save_history=True, history_fn="GAN SRCNN History.txt"):
         samples_per_epoch = img_utils.image_count()
         meanaxis = (0, 2, 3) if K.image_dim_ordering() == 'th' else (0, 1, 2)
 
@@ -879,8 +917,12 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
                                                        small_train_images=self.type_true_upscaling,
                                                        batch_size=nb_train_samples))
 
+            # [-1, 1] scale conversion from [0, 1]
+            batchX = ((batchX * 255) - 127.5) / 127.5
+            batchY = ((batchY * 255) - 127.5) / 127.5
+
             print("Pre-training Generator network")
-            hist = self.gen_model.fit(batchX, batchY, batch_size, nb_epoch=100, verbose=2)
+            hist = self.gen_model.fit(batchX, batchY, batch_size, nb_epoch=200, verbose=2)
             print("Generator pretrain final PSNR : ", hist.history['PSNRLoss'][-1])
 
             print("Pre-training Discriminator network")
@@ -891,8 +933,19 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
             print('BatchX mean (per channel) :', np.mean(batchX, axis=meanaxis))
 
             X = np.concatenate((genX, batchX))
-            y = [0] * nb_train_samples + [1] * nb_train_samples
+
+            # Using soft and noisy labels
+            if np.random.uniform() > disc_train_flip:
+                # give correct classifications
+                y = np.concatenate((np.random.uniform(low=0.0, high=0.3, size=nb_train_samples),
+                                    np.random.uniform(low=0.7, high=1.2, size=nb_train_samples)))
+            else:
+                # give wrong classifications (noisy labels)
+                y = np.concatenate((np.random.uniform(low=0.7, high=1.2, size=nb_train_samples),
+                                    np.random.uniform(low=0.0, high=0.3, size=nb_train_samples)))
+
             y = np.asarray(y, dtype=np.float32).reshape(-1, 1)
+            y = to_categorical(y, nb_classes=2)
 
             hist = self.disc_model.fit(X, y, batch_size=batch_size * 2,
                                        nb_epoch=1, verbose=0)
@@ -912,9 +965,11 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
             print("Epoch : %d" % (i + 1))
             print()
 
-            for x, y in img_utils.image_generator(train_path, scale_factor=self.scale_factor,
+            for x, _ in img_utils.image_generator(train_path, scale_factor=self.scale_factor,
                                                   small_train_images=self.type_true_upscaling,  batch_size=batch_size):
                 t1 = time.time()
+
+                x = ((x * 255) - 127.5) / 127.5
 
                 X_pred = self.gen_model.predict(x, batch_size)
 
@@ -922,16 +977,27 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
                 print("X_pred mean (per channel) :", np.mean(X_pred, axis=meanaxis))
 
                 X = np.concatenate((X_pred, x))
-                y_disc = [0] * batch_size + [1] * batch_size
+                # Using soft and noisy labels
+                if np.random.uniform() > disc_train_flip:
+                    # give correct classifications
+                    y_disc = np.concatenate((np.random.uniform(low=0.0, high=0.3, size=batch_size),
+                                             np.random.uniform(low=0.7, high=1.2, size=batch_size)))
+                else:
+                    # give wrong classifications (noisy labels)
+                    y_disc = np.concatenate((np.random.uniform(low=0.7, high=1.2, size=batch_size),
+                                             np.random.uniform(low=0.0, high=0.3, size=batch_size)))
+
                 y_disc = np.asarray(y_disc, dtype=np.float32).reshape(-1, 1)
+                y_disc = to_categorical(y_disc, nb_classes=2)
 
                 hist = self.disc_model.fit(X, y_disc, verbose=0, batch_size=batch_size, nb_epoch=1)
 
                 discriminator_loss = hist.history['loss'][0]
                 discriminator_acc = hist.history['acc'][0]
 
-                y_model = [1] * batch_size
-                y_model = np.asarray(y_model, dtype=np.float32).reshape(-1, 1)
+                # Using soft labels
+                y_model = np.random.uniform(low=0.7, high=1.2, size=batch_size)
+                y_model = to_categorical(y_model, nb_classes=2)
 
                 hist = self.model.fit(x, y_model, batch_size, nb_epoch=1, verbose=0)
                 generative_loss = hist.history['loss'][0]
