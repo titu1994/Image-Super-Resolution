@@ -843,7 +843,7 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
             disc_model = Model(disc_init, out)
 
             adam = optimizers.Adam(lr=1e-3)
-            disc_model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['acc'])
+            disc_model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['acc'])
             if load_weights: disc_model.load_weights(self.disc_weight_path)
 
             for layer in disc_model.layers:
@@ -857,7 +857,7 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
             for layer in full_model.layers[2].layers:
                 layer.trainable = False
 
-            full_model.compile(optimizers.Adam(lr=1e-4), loss='binary_crossentropy', metrics=['acc'])
+            full_model.compile(optimizers.Adam(lr=1e-4), loss='categorical_crossentropy', metrics=['acc'])
 
             for layer in disc_model.layers:
                 layer.trainable = True
@@ -937,17 +937,16 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
             # Using soft and noisy labels
             if np.random.uniform() > disc_train_flip:
                 # give correct classifications
-                y = np.concatenate((np.random.uniform(low=0.0, high=0.3, size=nb_train_samples),
-                                    np.random.uniform(low=0.7, high=1.2, size=nb_train_samples)))
+                y = [0] * nb_train_samples + [1] * nb_train_samples
             else:
                 # give wrong classifications (noisy labels)
-                y = np.concatenate((np.random.uniform(low=0.7, high=1.2, size=nb_train_samples),
-                                    np.random.uniform(low=0.0, high=0.3, size=nb_train_samples)))
+                y = [1] * nb_train_samples + [0] * nb_train_samples
 
             y = np.asarray(y, dtype=np.float32).reshape(-1, 1)
             y = to_categorical(y, nb_classes=2)
+            y = img_utils.smooth_gan_labels(y)
 
-            hist = self.disc_model.fit(X, y, batch_size=batch_size * 2,
+            hist = self.disc_model.fit(X, y, batch_size=batch_size,
                                        nb_epoch=1, verbose=0)
 
             print('Discriminator History :', hist.history)
@@ -980,15 +979,14 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
                 # Using soft and noisy labels
                 if np.random.uniform() > disc_train_flip:
                     # give correct classifications
-                    y_disc = np.concatenate((np.random.uniform(low=0.0, high=0.3, size=batch_size),
-                                             np.random.uniform(low=0.7, high=1.2, size=batch_size)))
+                    y_disc = [0] * nb_train_samples + [1] * nb_train_samples
                 else:
                     # give wrong classifications (noisy labels)
-                    y_disc = np.concatenate((np.random.uniform(low=0.7, high=1.2, size=batch_size),
-                                             np.random.uniform(low=0.0, high=0.3, size=batch_size)))
+                    y_disc = [1] * nb_train_samples + [0] * nb_train_samples
 
                 y_disc = np.asarray(y_disc, dtype=np.float32).reshape(-1, 1)
                 y_disc = to_categorical(y_disc, nb_classes=2)
+                y_disc = img_utils.smooth_gan_labels(y_disc)
 
                 hist = self.disc_model.fit(X, y_disc, verbose=0, batch_size=batch_size, nb_epoch=1)
 
@@ -996,8 +994,10 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
                 discriminator_acc = hist.history['acc'][0]
 
                 # Using soft labels
-                y_model = np.random.uniform(low=0.7, high=1.2, size=batch_size)
+                y_model = [1] * nb_train_samples
+                y_model = np.asarray(y_model, dtype=np.int).reshape(-1, 1)
                 y_model = to_categorical(y_model, nb_classes=2)
+                y_model = img_utils.smooth_gan_labels(y_model)
 
                 hist = self.model.fit(x, y_model, batch_size, nb_epoch=1, verbose=0)
                 generative_loss = hist.history['loss'][0]
