@@ -1,8 +1,8 @@
 from __future__ import print_function, division
 
 from keras.models import Model
-from keras.layers import merge, Input, Dense, Flatten, BatchNormalization, Activation, LeakyReLU
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D
+from keras.layers import Concatenate, Add, Average, Input, Dense, Flatten, BatchNormalization, Activation, LeakyReLU
+from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D, Convolution2DTranspose
 from keras import backend as K
 from keras.utils.np_utils import to_categorical
 import keras.callbacks as callbacks
@@ -472,10 +472,10 @@ class ImageSuperResolutionModel(BaseSuperResolutionModel):
         """
         init = super(ImageSuperResolutionModel, self).create_model(height, width, channels, load_weights, batch_size)
 
-        x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
-        x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
+        x = Convolution2D(self.n1, (self.f1, self.f1), activation='relu', padding='same', name='level1')(init)
+        x = Convolution2D(self.n2, (self.f2, self.f2), activation='relu', padding='same', name='level2')(x)
 
-        out = Convolution2D(channels, self.f3, self.f3, border_mode='same', name='output')(x)
+        out = Convolution2D(channels, (self.f3, self.f3), padding='same', name='output')(x)
 
         model = Model(init, out)
 
@@ -512,15 +512,15 @@ class ExpantionSuperResolution(BaseSuperResolutionModel):
         """
         init = super(ExpantionSuperResolution, self).create_model(height, width, channels, load_weights, batch_size)
 
-        x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
+        x = Convolution2D(self.n1, (self.f1, self.f1), activation='relu', padding='same', name='level1')(init)
 
-        x1 = Convolution2D(self.n2, self.f2_1, self.f2_1, activation='relu', border_mode='same', name='lavel1_1')(x)
-        x2 = Convolution2D(self.n2, self.f2_2, self.f2_2, activation='relu', border_mode='same', name='lavel1_2')(x)
-        x3 = Convolution2D(self.n2, self.f2_3, self.f2_3, activation='relu', border_mode='same', name='lavel1_3')(x)
+        x1 = Convolution2D(self.n2, (self.f2_1, self.f2_1), activation='relu', padding='same', name='lavel1_1')(x)
+        x2 = Convolution2D(self.n2, (self.f2_2, self.f2_2), activation='relu', padding='same', name='lavel1_2')(x)
+        x3 = Convolution2D(self.n2, (self.f2_3, self.f2_3), activation='relu', padding='same', name='lavel1_3')(x)
 
-        x = merge([x1, x2, x3], mode='ave')
+        x = Average()([x1, x2, x3])
 
-        out = Convolution2D(channels, self.f3, self.f3, activation='relu', border_mode='same', name='output')(x)
+        out = Convolution2D(channels, (self.f3, self.f3), activation='relu', padding='same', name='output')(x)
 
         model = Model(init, out)
         adam = optimizers.Adam(lr=1e-3)
@@ -558,16 +558,16 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
         else:
             output_shape = (None, width, height, channels)
 
-        level1_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
-        level2_1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(level1_1)
+        level1_1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(init)
+        level2_1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(level1_1)
 
-        level2_2 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=output_shape, border_mode='same')(level2_1)
-        level2 = merge([level2_1, level2_2], mode='sum')
+        level2_2 = Convolution2DTranspose(self.n1, (3, 3), activation='relu', padding='same')(level2_1)
+        level2 = Add()([level2_1, level2_2])
 
-        level1_2 = Deconvolution2D(self.n1, 3, 3, activation='relu', output_shape=output_shape, border_mode='same')(level2)
-        level1 = merge([level1_1, level1_2], mode='sum')
+        level1_2 = Convolution2DTranspose(self.n1, (3, 3), activation='relu', padding='same')(level2)
+        level1 = Add()([level1_1, level1_2])
 
-        decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(level1)
+        decoded = Convolution2D(channels, (5, 5), activation='linear', padding='same')(level1)
 
         model = Model(init, decoded)
         adam = optimizers.Adam(lr=1e-3)
@@ -599,30 +599,30 @@ class DeepDenoiseSR(BaseSuperResolutionModel):
         # Perform check that model input shape is divisible by 4
         init = super(DeepDenoiseSR, self).create_model(height, width, channels, load_weights, batch_size)
 
-        c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(init)
-        c1 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(c1)
+        c1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(init)
+        c1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(c1)
 
         x = MaxPooling2D((2, 2))(c1)
 
-        c2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(x)
-        c2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(c2)
+        c2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(x)
+        c2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(c2)
 
         x = MaxPooling2D((2, 2))(c2)
 
-        c3 = Convolution2D(self.n3, 3, 3, activation='relu', border_mode='same')(x)
+        c3 = Convolution2D(self.n3, (3, 3), activation='relu', padding='same')(x)
 
         x = UpSampling2D()(c3)
 
-        c2_2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(x)
-        c2_2 = Convolution2D(self.n2, 3, 3, activation='relu', border_mode='same')(c2_2)
+        c2_2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(x)
+        c2_2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(c2_2)
 
-        m1 = merge([c2, c2_2], mode='sum')
+        m1 = Add()([c2, c2_2])
         m1 = UpSampling2D()(m1)
 
-        c1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(m1)
-        c1_2 = Convolution2D(self.n1, 3, 3, activation='relu', border_mode='same')(c1_2)
+        c1_2 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(m1)
+        c1_2 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(c1_2)
 
-        m2 = merge([c1, c1_2], mode='sum')
+        m2 = Add()([c1, c1_2])
 
         decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(m2)
 
@@ -655,11 +655,11 @@ class ResNetSR(BaseSuperResolutionModel):
     def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
         init =  super(ResNetSR, self).create_model(height, width, channels, load_weights, batch_size)
 
-        x0 = Convolution2D(64, 3, 3, activation='relu', border_mode='same', name='sr_res_conv1')(init)
+        x0 = Convolution2D(64, (3, 3), activation='relu', padding='same', name='sr_res_conv1')(init)
 
-        x1 = Convolution2D(64, 3, 3, activation='relu', border_mode='same', subsample=(2, 2), name='sr_res_conv2')(x0)
+        x1 = Convolution2D(64, (3, 3), activation='relu', padding='same', strides=(2, 2), name='sr_res_conv2')(x0)
 
-        x2 = Convolution2D(64, 3, 3, activation='relu', border_mode='same', subsample=(2, 2), name='sr_res_conv3')(x1)
+        x2 = Convolution2D(64, (3, 3), activation='relu', padding='same', strides=(2, 2), name='sr_res_conv3')(x1)
 
         x = self._residual_block(x2, 1)
 
@@ -668,12 +668,12 @@ class ResNetSR(BaseSuperResolutionModel):
             x = self._residual_block(x, i + 2)
 
         x = self._upscale_block(x, 1)
-        x = merge([x, x1], mode='sum')
+        x = Add()([x, x1])
 
         x = self._upscale_block(x, 2)
-        x = merge([x, x0], mode='sum')
+        x = Add()([x, x0])
 
-        x = Convolution2D(3, 3, 3, activation="linear", border_mode='same', name='sr_res_conv_final')(x)
+        x = Convolution2D(3, 3, 3, activation="linear", padding='same', name='sr_res_conv_final')(x)
 
         model = Model(init, x)
 
@@ -685,27 +685,29 @@ class ResNetSR(BaseSuperResolutionModel):
         return model
 
     def _residual_block(self, ip, id):
+        mode = False if self.mode == 2 else None
+        channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
         init = ip
 
-        x = Convolution2D(64, 3, 3, activation='linear', border_mode='same',
+        x = Convolution2D(64, (3, 3), activation='linear', padding='same',
                           name='sr_res_conv_' + str(id) + '_1')(ip)
-        x = BatchNormalization(axis=1, mode=self.mode, name="sr_res_batchnorm_" + str(id) + "_1")(x)
+        x = BatchNormalization(axis=channel_axis, name="sr_res_batchnorm_" + str(id) + "_1")(x, training=mode)
         x = Activation('relu', name="sr_res_activation_" + str(id) + "_1")(x)
 
-        x = Convolution2D(64, 3, 3, activation='linear', border_mode='same',
+        x = Convolution2D(64, (3, 3), activation='linear', padding='same',
                           name='sr_res_conv_' + str(id) + '_2')(x)
-        x = BatchNormalization(axis=1, mode=self.mode, name="sr_res_batchnorm_" + str(id) + "_2")(x)
+        x = BatchNormalization(axis=channel_axis, name="sr_res_batchnorm_" + str(id) + "_2")(x, training=mode)
 
-        m = merge([x, init], mode='sum', name="sr_res_merge_" + str(id))
+        m = Add(name="sr_res_merge_" + str(id))([x, init])
 
         return m
 
     def _upscale_block(self, ip, id):
         init = ip
 
-        x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='sr_res_upconv1_%d' % id)(init)
+        x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='sr_res_upconv1_%d' % id)(init)
         x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
-        x = Convolution2D(self.n, 3, 3, activation="relu", border_mode='same', name='sr_res_filter1_%d' % id)(x)
+        x = Convolution2D(self.n, (3, 3), activation="relu", padding='same', name='sr_res_filter1_%d' % id)(x)
 
         return x
 
@@ -736,12 +738,12 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
         init = super(EfficientSubPixelConvolutionalSR, self).create_model(height, width, channels,
                                                                           load_weights, batch_size)
 
-        x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='level1')(init)
-        x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='level2')(x)
+        x = Convolution2D(self.n1, (self.f1, self.f1), activation='relu', padding='same', name='level1')(init)
+        x = Convolution2D(self.n2, (self.f2, self.f2), activation='relu', padding='same', name='level2')(x)
 
         x = self._upscale_block(x, 1)
 
-        out = Convolution2D(3, 5, 5, activation='linear', border_mode='same')(x)
+        out = Convolution2D(3, (5, 5), activation='linear', padding='same')(x)
 
         model = Model(init, out)
 
@@ -755,9 +757,9 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
     def _upscale_block(self, ip, id):
         init = ip
 
-        x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='espcnn_upconv1_%d' % id)(init)
+        x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='espcnn_upconv1_%d' % id)(init)
         x = SubPixelUpscaling(r=2, channels=self.n1, name='espcnn_upconv1__upscale1_%d' % id)(x)
-        x = Convolution2D(256, 3, 3, activation="relu", border_mode='same', name='espcnn_upconv1_filter1_%d' % id)(x)
+        x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='espcnn_upconv1_filter1_%d' % id)(x)
 
         return x
 
@@ -797,12 +799,12 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
 
         gen_init = super(GANImageSuperResolutionModel, self).create_model(height, width, channels, load_weights, batch_size)
 
-        x = Convolution2D(self.n1, self.f1, self.f1, activation='relu', border_mode='same', name='gen_level1')(gen_init)
+        x = Convolution2D(self.n1, (self.f1, self.f1), activation='relu', padding='same', name='gen_level1')(gen_init)
         x = LeakyReLU(alpha=0.25)(x)
-        x = Convolution2D(self.n2, self.f2, self.f2, activation='relu', border_mode='same', name='gen_level2')(x)
+        x = Convolution2D(self.n2, (self.f2, self.f2), activation='relu', padding='same', name='gen_level2')(x)
         x = LeakyReLU(alpha=0.25)(x)
 
-        out = Convolution2D(channels, self.f3, self.f3, activation='tanh', border_mode='same', name='gen_output')(x)
+        out = Convolution2D(channels, (self.f3, self.f3), activation='tanh', padding='same', name='gen_output')(x)
 
         gen_model = Model(gen_init, out)
 
@@ -821,19 +823,19 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
         if mode == 'train':
             disc_init = super(GANImageSuperResolutionModel, self).create_model(height, width, channels, load_weights, batch_size)
 
-            x = Convolution2D(64, 3, 3, border_mode='same', name='disc_level1_1')(disc_init)
+            x = Convolution2D(64, (3, 3), padding='same', name='disc_level1_1')(disc_init)
             x = LeakyReLU(alpha=0.25, name='disc_lr_1_1')(x)
-            x = Convolution2D(64, 3, 3, border_mode='same', name='disc_level1_2',
-                          subsample=(2, 2))(x)
+            x = Convolution2D(64, (3, 3), padding='same', name='disc_level1_2',
+                          strides=(2, 2))(x)
             x = LeakyReLU(alpha=0.25, name='disc_lr_1_2')(x)
-            x = BatchNormalization(mode=2, axis=channel_axis, name='disc_bn_1')(x)
+            x = BatchNormalization(axis=channel_axis, name='disc_bn_1')(x, training=False)
 
-            x = Convolution2D(128, 3, 3, border_mode='same', name='disc_level2_1')(x)
+            x = Convolution2D(128, (3, 3), padding='same', name='disc_level2_1')(x)
             x = LeakyReLU(alpha=0.25, name='disc_lr_2_1')(x)
-            x = Convolution2D(128, 3, 3, border_mode='same', name='disc_level2_2',
-                              subsample=(2, 2))(x)
+            x = Convolution2D(128, (3, 3), padding='same', name='disc_level2_2',
+                              strides=(2, 2))(x)
             x = LeakyReLU(alpha=0.25, name='disc_lr_2_2')(x)
-            x = BatchNormalization(mode=2, axis=channel_axis, name='disc_bn_2')(x)
+            x = BatchNormalization(axis=channel_axis, name='disc_bn_2')(x, training=False)
 
             x = Flatten(name='disc_flatten')(x)
             x = Dense(128, name='disc_dense_1')(x)

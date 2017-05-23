@@ -1,4 +1,4 @@
-# Image Super Resolution using in Keras
+# Image Super Resolution using in Keras 2+ (Theano Backend only)
 
 Implementation of Image Super Resolution CNN in Keras from the paper 
 <i><a href="https://arxiv.org/pdf/1501.00092v3.pdf">Image Super-Resolution Using Deep Convolutional Networks</a></i>.
