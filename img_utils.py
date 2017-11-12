@@ -4,6 +4,7 @@ import numpy as np
 from scipy.misc import imsave, imread, imresize
 from sklearn.feature_extraction.image import reconstruct_from_patches_2d, extract_patches_2d
 from scipy.ndimage.filters import gaussian_filter
+import cv
 
 from keras import backend as K
 
@@ -18,15 +19,15 @@ which not offer adequate training samples.
 '''
 _image_scale_multiplier = 1
 
-img_size = 256 * _image_scale_multiplier
-stride = 16 * _image_scale_multiplier
+img_size = 128 * _image_scale_multiplier
+stride = 64 * _image_scale_multiplier
 
 assert (img_size ** 2) % (stride ** 2) == 0, "Number of images generated from strided subsample of the image needs to be \n" \
                                              "a positive integer. Change stride such that : \n" \
                                              "(img_size ** 2) / (stride ** 2) is a positive integer."
 
-input_path = r"input_images/"
-validation_path = r"val_images/"
+input_path = r"D:\Yue\Documents\Datasets\train2014\train2014\\" # r"input_images/"
+validation_path = r"val_images/" # r"D:\Yue\Documents\Datasets\MSCOCO\val\valset\\" # r"val_images/"
 
 validation_set5_path = validation_path + "set5/"
 validation_set14_path = validation_path + "set14/"
@@ -39,7 +40,86 @@ validation_output_path = base_dataset_dir + r"train_images/validation/"
 if not os.path.exists(output_path):
     os.makedirs(output_path)
 
-def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1, true_upscale=False):
+# def transform_images(directory, output_directory, scaling_factor=2, max_nb_images=-1, true_upscale=False):
+#     index = 1
+#
+#     if not os.path.exists(output_directory + "X/"):
+#         os.makedirs(output_directory + "X/")
+#
+#     if not os.path.exists(output_directory + "y/"):
+#         os.makedirs(output_directory + "y/")
+#
+#     # For each image in input_images directory
+#     nb_images = len([name for name in os.listdir(directory)])
+#
+#     if max_nb_images != -1:
+#         print("Transforming %d images." % max_nb_images)
+#     else:
+#         assert max_nb_images <= nb_images, "Max number of images must be less than number of images in path"
+#         print("Transforming %d images." % (nb_images))
+#
+#     if nb_images == 0:
+#         print("Extract the training images or images from imageset_91.zip (found in the releases of the project) "
+#               "into a directory with the name 'input_images'")
+#         print("Extract the validation images or images from set5_validation.zip (found in the releases of the project) "
+#               "into a directory with the name 'val_images'")
+#         exit()
+#
+#     for file in os.listdir(directory):
+#         img = imread(directory + file, mode='RGB')
+#
+#         # Resize to 256 x 256
+#         img = imresize(img, (img_size, img_size))
+#
+#         # Create patches
+#         hr_patch_size = (16 * scaling_factor * _image_scale_multiplier)
+#         nb_hr_images = (img_size ** 2) // (stride ** 2)
+#
+#         hr_samples = np.empty((nb_hr_images, hr_patch_size, hr_patch_size, 3))
+#
+#         image_subsample_iterator = subimage_generator(img, stride, hr_patch_size, nb_hr_images)
+#
+#         stride_range = np.sqrt(nb_hr_images).astype(int)
+#
+#         i = 0
+#         for j in range(stride_range):
+#             for k in range(stride_range):
+#                 hr_samples[i, :, :, :] = next(image_subsample_iterator)
+#                 i += 1
+#
+#         lr_patch_size = 16 * _image_scale_multiplier
+#
+#         t1 = time.time()
+#         # Create nb_hr_images 'X' and 'Y' sub-images of size hr_patch_size for each patch
+#         for i in range(nb_hr_images):
+#             ip = hr_samples[i]
+#             # Save ground truth image X
+#             imsave(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
+#
+#             # Apply Gaussian Blur to Y
+#             op = gaussian_filter(ip, sigma=0.5)
+#
+#             # Subsample by scaling factor to Y
+#             op = imresize(op, (lr_patch_size, lr_patch_size), interp='bicubic')
+#
+#             if not true_upscale:
+#                 # Upscale by scaling factor to Y
+#                 op = imresize(op, (hr_patch_size, hr_patch_size), interp='bicubic')
+#
+#             # Save Y
+#             imsave(output_directory + "/X/" + "%d_%d.png" % (index, i+1), op)
+#
+#         print("Finished image %d in time %0.2f seconds. (%s)" % (index, time.time() - t1, file))
+#         index += 1
+#
+#         if max_nb_images > 0 and index >= max_nb_images:
+#             print("Transformed maximum number of images. ")
+#             break
+#
+#     print("Images transformed. Saved at directory : %s" % (output_directory))
+
+
+def transform_images_temp(directory, output_directory, scaling_factor=2, max_nb_images=-1, true_upscale=False):
     index = 1
 
     if not os.path.exists(output_directory + "X/"):
@@ -71,7 +151,8 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
         img = imresize(img, (img_size, img_size))
 
         # Create patches
-        hr_patch_size = (16 * scaling_factor * _image_scale_multiplier)
+        hr_patch_size = 64
+        lr_patch_size = 32
         nb_hr_images = (img_size ** 2) // (stride ** 2)
 
         hr_samples = np.empty((nb_hr_images, hr_patch_size, hr_patch_size, 3))
@@ -86,7 +167,6 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
                 hr_samples[i, :, :, :] = next(image_subsample_iterator)
                 i += 1
 
-        lr_patch_size = 16 * _image_scale_multiplier
 
         t1 = time.time()
         # Create nb_hr_images 'X' and 'Y' sub-images of size hr_patch_size for each patch
@@ -96,10 +176,10 @@ def transform_images(directory, output_directory, scaling_factor=2, max_nb_image
             imsave(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
 
             # Apply Gaussian Blur to Y
-            op = gaussian_filter(ip, sigma=0.5)
+            #op = gaussian_filter(ip, sigma=0.5)
 
             # Subsample by scaling factor to Y
-            op = imresize(op, (lr_patch_size, lr_patch_size), interp='bicubic')
+            op = imresize(ip, (lr_patch_size, lr_patch_size), interp='bicubic')
 
             if not true_upscale:
                 # Upscale by scaling factor to Y
@@ -128,8 +208,8 @@ def val_image_count():
 
 def subimage_generator(img, stride, patch_size, nb_hr_images):
     for _ in range(nb_hr_images):
-        for x in range(0, img_size - patch_size, stride):
-            for y in range(0, img_size - patch_size, stride):
+        for x in range(0, img_size, stride):
+            for y in range(0, img_size, stride):
                 subimage = img[x : x + patch_size, y : y + patch_size, :]
 
                 yield subimage
@@ -157,15 +237,18 @@ def image_generator(directory, scale_factor=2, target_shape=None, channels=3, sm
                 y_image_shape = (channels, 16 * scale_factor * _image_scale_multiplier,
                                  16 * scale_factor * _image_scale_multiplier)
             else:
-                image_shape = (16 * _image_scale_multiplier, 16 * _image_scale_multiplier, channels)
-                y_image_shape = (16 * scale_factor * _image_scale_multiplier,
-                                 16 * scale_factor * _image_scale_multiplier, channels)
+                # image_shape = (16 * _image_scale_multiplier, 16 * _image_scale_multiplier, channels)
+                # y_image_shape = (16 * scale_factor * _image_scale_multiplier,
+                #                  16 * scale_factor * _image_scale_multiplier, channels)
+                image_shape = (32 * _image_scale_multiplier, 32 * _image_scale_multiplier, channels)
+                y_image_shape = (32 * scale_factor * _image_scale_multiplier,
+                                 32 * scale_factor * _image_scale_multiplier, channels)
         else:
             if K.image_dim_ordering() == "th":
-                image_shape = (channels, 16 * scale_factor * _image_scale_multiplier, 16 * scale_factor * _image_scale_multiplier)
+                image_shape = (channels, 32 * scale_factor * _image_scale_multiplier, 32 * scale_factor * _image_scale_multiplier)
                 y_image_shape = image_shape
             else:
-                image_shape = (16 * scale_factor * _image_scale_multiplier, 16 * scale_factor * _image_scale_multiplier,
+                image_shape = (32 * scale_factor * _image_scale_multiplier, 32 * scale_factor * _image_scale_multiplier,
                                channels)
                 y_image_shape = image_shape
     else:
@@ -209,7 +292,7 @@ def image_generator(directory, scale_factor=2, target_shape=None, channels=3, sm
             x_fn = X_filenames[j]
             img = imread(x_fn, mode='RGB')
             if small_train_images:
-                img = imresize(img, (16 * _image_scale_multiplier, 16 * _image_scale_multiplier))
+                img = imresize(img, (32 * _image_scale_multiplier, 32 * _image_scale_multiplier))
             img = img.astype('float32') / 255.
 
             if K.image_dim_ordering() == "th":
@@ -280,8 +363,8 @@ if __name__ == "__main__":
     # Leave as false to create same size input and output images
     true_upscale = False
 
-    transform_images(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1,
-                     true_upscale=true_upscale)
-    transform_images(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1,
+    # transform_images_temp(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1,
+    #                  true_upscale=true_upscale)
+    transform_images_temp(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1,
                      true_upscale=true_upscale)
     pass

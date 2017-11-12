@@ -14,6 +14,7 @@ import img_utils
 import numpy as np
 import os
 import time
+import cv2
 
 train_path = img_utils.output_path
 validation_path = img_utils.validation_output_path
@@ -31,7 +32,7 @@ def PSNRLoss(y_true, y_pred):
     However, since we are scaling our input, MAXp = 1. Therefore 20 * log10(1) = 0.
     Thus we remove that component completely and only compute the remaining MSE component.
     """
-    return -10. * np.log10(K.mean(K.square(y_pred - y_true)))
+    return -10. * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.)
 
 def psnr(y_true, y_pred):
     assert y_true.shape == y_pred.shape, "Cannot calculate PSNR. Input shapes not same." \
@@ -63,14 +64,20 @@ class BaseSuperResolutionModel(object):
         """
         Subclass dependent implementation.
         """
-        if self.type_requires_divisible_shape:
+        if self.type_requires_divisible_shape and height is not None and width is not None:
             assert height * img_utils._image_scale_multiplier % 4 == 0, "Height of the image must be divisible by 4"
             assert width * img_utils._image_scale_multiplier % 4 == 0, "Width of the image must be divisible by 4"
 
         if K.image_dim_ordering() == "th":
-            shape = (channels, width * img_utils._image_scale_multiplier, height * img_utils._image_scale_multiplier)
+            if width is not None and height is not None:
+                shape = (channels, width * img_utils._image_scale_multiplier, height * img_utils._image_scale_multiplier)
+            else:
+                shape = (channels, None, None)
         else:
-            shape = (width * img_utils._image_scale_multiplier, height * img_utils._image_scale_multiplier, channels)
+            if width is not None and height is not None:
+                shape = (width * img_utils._image_scale_multiplier, height * img_utils._image_scale_multiplier, channels)
+            else:
+                shape = (None, None, channels)
 
         init = Input(shape=shape)
 
@@ -86,25 +93,25 @@ class BaseSuperResolutionModel(object):
         if self.model == None: self.create_model(batch_size=batch_size)
 
         callback_list = [callbacks.ModelCheckpoint(self.weight_path, monitor='val_PSNRLoss', save_best_only=True,
-                                                   mode='max', save_weights_only=True)]
+                                                   mode='max', save_weights_only=True, verbose=2)]
         if save_history: callback_list.append(HistoryCheckpoint(history_fn))
 
         print("Training model : %s" % (self.__class__.__name__))
         self.model.fit_generator(img_utils.image_generator(train_path, scale_factor=self.scale_factor,
                                                            small_train_images=self.type_true_upscaling,
                                                            batch_size=batch_size),
-                                 samples_per_epoch=samples_per_epoch,
-                                 nb_epoch=nb_epochs, callbacks=callback_list,
+                                 steps_per_epoch=samples_per_epoch // batch_size + 1,
+                                 epochs=nb_epochs, callbacks=callback_list,
                                  validation_data=img_utils.image_generator(validation_path,
                                                                            scale_factor=self.scale_factor,
                                                                            small_train_images=self.type_true_upscaling,
                                                                            batch_size=batch_size),
-                                 nb_val_samples=val_count)
+                                 validation_steps=val_count // batch_size + 1)
 
         return self.model
 
     def evaluate(self, validation_dir):
-        if self.type_requires_divisible_shape:
+        if self.type_requires_divisible_shape and not self.type_true_upscaling:
             _evaluate_denoise(self, validation_dir)
         else:
             _evaluate(self, validation_dir)
@@ -202,6 +209,10 @@ class BaseSuperResolutionModel(object):
 
         result = np.clip(result, 0, 255).astype('uint8')
 
+        result = cv2.pyrUp(result)
+        result = cv2.medianBlur(result, 3)
+        result = cv2.pyrDown(result)
+
         if verbose: print("\nCompleted De-processing image.")
 
         if return_image:
@@ -250,8 +261,8 @@ class BaseSuperResolutionModel(object):
 
 def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=False):
     """
-        Evaluates the model on the Validation images
-        """
+    Evaluates the model on the Validation images
+    """
     print("Validating %s model" % sr_model.model_name)
     if sr_model.model == None: sr_model.create_model(load_weights=True)
     if sr_model.evaluation_func is None:
@@ -309,7 +320,7 @@ def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=Fa
 
             y = np.expand_dims(y, axis=0)
 
-            img = img_utils.imresize(x_temp, (x_width // sr_model.scale_factor, x_height // sr_model.scale_factor),
+            img = img_utils.imresize(x_temp, (x_width, x_height),
                                      interp='bicubic')
 
             if not sr_model.type_true_upscaling:
@@ -399,8 +410,8 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir, scale
                 x_temp /= 255.
                 y /= 255.
 
-            img = img_utils.imresize(x_temp, (width // sr_model.scale_factor, height // sr_model.scale_factor),
-                                     interp='bicubic')
+            img = img_utils.imresize(x_temp[0], (width // sr_model.scale_factor, height // sr_model.scale_factor),
+                                     interp='bicubic', mode='RGB')
 
             if not sr_model.type_true_upscaling:
                 img = img_utils.imresize(img, (width, height), interp='bicubic')
@@ -419,7 +430,7 @@ def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir, scale
                                                           [sr_model.model.layers[-1].output])
                 else:
                     sr_model.evaluation_func = K.function([sr_model.model.layers[0].input],
-                                                      [sr_model.model.layers[-1].output])
+                                                          [sr_model.model.layers[-1].output])
 
             if sr_model.uses_learning_phase:
                 y_pred = sr_model.evaluation_func([x, 0])[0][0]
@@ -651,35 +662,38 @@ class ResNetSR(BaseSuperResolutionModel):
         self.mode = 2
 
         self.weight_path = "weights/ResNetSR %dX.h5" % (self.scale_factor)
+        self.type_true_upscaling = True
 
     def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
         init =  super(ResNetSR, self).create_model(height, width, channels, load_weights, batch_size)
 
         x0 = Convolution2D(64, (3, 3), activation='relu', padding='same', name='sr_res_conv1')(init)
 
-        x1 = Convolution2D(64, (3, 3), activation='relu', padding='same', strides=(2, 2), name='sr_res_conv2')(x0)
+        #x1 = Convolution2D(64, (3, 3), activation='relu', padding='same', strides=(2, 2), name='sr_res_conv2')(x0)
 
-        x2 = Convolution2D(64, (3, 3), activation='relu', padding='same', strides=(2, 2), name='sr_res_conv3')(x1)
+        #x2 = Convolution2D(64, (3, 3), activation='relu', padding='same', strides=(2, 2), name='sr_res_conv3')(x1)
 
-        x = self._residual_block(x2, 1)
+        x = self._residual_block(x0, 1)
 
-        nb_residual = 14
+        nb_residual = 5
         for i in range(nb_residual):
             x = self._residual_block(x, i + 2)
 
-        x = self._upscale_block(x, 1)
-        x = Add()([x, x1])
-
-        x = self._upscale_block(x, 2)
         x = Add()([x, x0])
 
-        x = Convolution2D(3, 3, 3, activation="linear", padding='same', name='sr_res_conv_final')(x)
+        x = self._upscale_block(x, 1)
+        #x = Add()([x, x1])
+
+        #x = self._upscale_block(x, 2)
+        #x = Add()([x, x0])
+
+        x = Convolution2D(3, (3, 3), activation="linear", padding='same', name='sr_res_conv_final')(x)
 
         model = Model(init, x)
 
         adam = optimizers.Adam(lr=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
-        if load_weights: model.load_weights(self.weight_path)
+        if load_weights: model.load_weights(self.weight_path, by_name=True)
 
         self.model = model
         return model
@@ -705,9 +719,16 @@ class ResNetSR(BaseSuperResolutionModel):
     def _upscale_block(self, ip, id):
         init = ip
 
-        x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='sr_res_upconv1_%d' % id)(init)
-        x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
+        channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
+        channels = init._keras_shape[channel_dim]
+
+        #x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='sr_res_upconv1_%d' % id)(init)
+        #x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
+        x = UpSampling2D()(init)
         x = Convolution2D(self.n, (3, 3), activation="relu", padding='same', name='sr_res_filter1_%d' % id)(x)
+
+        # x = Convolution2DTranspose(channels, (4, 4), strides=(2, 2), padding='same', activation='relu',
+        #                            name='upsampling_deconv_%d' % id)(init)
 
         return x
 
@@ -743,7 +764,7 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
 
         x = self._upscale_block(x, 1)
 
-        out = Convolution2D(3, (5, 5), activation='linear', padding='same')(x)
+        out = Convolution2D(3, (9, 9), activation='linear', padding='same')(x)
 
         model = Model(init, out)
 
@@ -757,9 +778,11 @@ class EfficientSubPixelConvolutionalSR(BaseSuperResolutionModel):
     def _upscale_block(self, ip, id):
         init = ip
 
-        x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='espcnn_upconv1_%d' % id)(init)
-        x = SubPixelUpscaling(r=2, channels=self.n1, name='espcnn_upconv1__upscale1_%d' % id)(x)
-        x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='espcnn_upconv1_filter1_%d' % id)(x)
+        # x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='espcnn_upconv1_%d' % id)(init)
+        # x = SubPixelUpscaling(r=2, channels=self.n1, name='espcnn_upconv1__upscale1_%d' % id)(x)
+        # x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='espcnn_upconv1_filter1_%d' % id)(x)
+
+        x = Convolution2DTranspose(128, (3, 3), strides=(2, 2), padding='same', activation='relu')(init)
 
         return x
 
