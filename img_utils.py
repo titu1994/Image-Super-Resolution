@@ -119,7 +119,8 @@ if not os.path.exists(output_path):
 #     print("Images transformed. Saved at directory : %s" % (output_directory))
 
 
-def transform_images_temp(directory, output_directory, scaling_factor=2, max_nb_images=-1, true_upscale=False):
+def transform_images_temp(directory, output_directory, scaling_factor=2, max_nb_images=-1, true_upscale=False,
+                          id_advance=0):
     index = 1
 
     if not os.path.exists(output_directory + "X/"):
@@ -173,7 +174,7 @@ def transform_images_temp(directory, output_directory, scaling_factor=2, max_nb_
         for i in range(nb_hr_images):
             ip = hr_samples[i]
             # Save ground truth image X
-            imsave(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
+            imsave(output_directory + "/y/" + "%d_%d.png" % (index + id_advance, i + 1), ip)
 
             # Apply Gaussian Blur to Y
             #op = gaussian_filter(ip, sigma=0.5)
@@ -186,9 +187,9 @@ def transform_images_temp(directory, output_directory, scaling_factor=2, max_nb_
                 op = imresize(op, (hr_patch_size, hr_patch_size), interp='bicubic')
 
             # Save Y
-            imsave(output_directory + "/X/" + "%d_%d.png" % (index, i+1), op)
+            imsave(output_directory + "/X/" + "%d_%d.png" % (index + id_advance, id_advance + i + 1), op)
 
-        print("Finished image %d in time %0.2f seconds. (%s)" % (index, time.time() - t1, file))
+        print("Finished image %d in time %0.2f seconds. (%s)" % (index + id_advance, time.time() - t1, file))
         index += 1
 
         if max_nb_images > 0 and index >= max_nb_images:
@@ -229,7 +230,7 @@ def combine_patches(in_patches, out_shape, scale):
     return recon
 
 def image_generator(directory, scale_factor=2, target_shape=None, channels=3, small_train_images=False, shuffle=True,
-                    batch_size=32, seed=None):
+                    batch_size=32, nb_inputs=1, seed=None):
     if not target_shape:
         if small_train_images:
             if K.image_dim_ordering() == "th":
@@ -309,7 +310,11 @@ def image_generator(directory, scale_factor=2, target_shape=None, channels=3, sm
             else:
                 batch_y[i] = img
 
-        yield (batch_x, batch_y)
+        if nb_inputs == 1:
+            yield (batch_x, batch_y)
+        else:
+            batch_x = [batch_x for i in range(nb_inputs)]
+            yield batch_x, batch_y
 
 def _index_generator(N, batch_size=32, shuffle=True, seed=None):
     batch_index = 0
@@ -361,10 +366,12 @@ if __name__ == "__main__":
 
     # Set true_upscale to True to generate smaller training images that will then be true upscaled.
     # Leave as false to create same size input and output images
-    true_upscale = False
+    true_upscale = True
 
     # transform_images_temp(input_path, output_path, scaling_factor=scaling_factor, max_nb_images=-1,
     #                  true_upscale=true_upscale)
     transform_images_temp(validation_set5_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1,
                      true_upscale=true_upscale)
+    # transform_images_temp(validation_set14_path, validation_output_path, scaling_factor=scaling_factor, max_nb_images=-1,
+    #                       true_upscale=true_upscale)
     pass

@@ -4,7 +4,7 @@ import tensorflow as tf
 
 parser = argparse.ArgumentParser(description="Up-Scales an image using Image Super Resolution Model")
 parser.add_argument("imgpath", type=str, nargs="+", help="Path to input image")
-parser.add_argument("--model", type=str, default="dsr", help="Use either image super resolution (sr), "
+parser.add_argument("--model", type=str, default="distilled_rnsr", help="Use either image super resolution (sr), "
                         "expanded super resolution (esr), denoising auto encoder sr (dsr), "
                         "deep denoising sr (ddsr) or res net sr (rnsr)")
 parser.add_argument("--scale", default=2, help='Scaling factor. Default = 2x')
@@ -23,8 +23,9 @@ args = parser.parse_args()
 suffix = args.suffix
 
 model_type = str(args.model).lower()
-assert model_type in ["sr", "esr", "dsr", "ddsr", "rnsr"], 'Model type must be either "sr", "esr", "dsr", ' \
-                                                           '"ddsr" or "rnsr"'
+if not model_type in ["sr", "esr", "dsr", "ddsr", "rnsr", "distilled_rnsr"]:
+    raise ValueError('Model type must be either "sr", "esr", "dsr", '
+                     '"ddsr", "rnsr" or "distilled_rnsr"')
 
 mode = str(args.mode).lower()
 assert mode in ['fast', 'patch'], 'Mode of operation must be either "fast" or "patch"'
@@ -48,7 +49,9 @@ with tf.device('/CPU:0'):
             model = models.DeepDenoiseSR(scale_factor)
         elif model_type == "rnsr":
             model = models.ResNetSR(scale_factor)
+        elif model_type == "distilled_rnsr":
+            model = models.DistilledResNetSR(scale_factor)
         else:
-            model = models.DeepDenoiseSR(scale_factor)
+            model = models.DistilledResNetSR(scale_factor)
 
         model.upscale(p, save_intermediate=save, mode=mode, patch_size=patch_size, suffix=suffix)

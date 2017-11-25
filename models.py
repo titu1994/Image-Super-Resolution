@@ -1064,3 +1064,70 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
 
     def evaluate(self, validation_dir):
         _evaluate(self, validation_dir, scale_pred=True)
+
+class DistilledResNetSR(BaseSuperResolutionModel):
+
+    def __init__(self, scale_factor):
+        super(DistilledResNetSR, self).__init__("DistilledResNetSR", scale_factor)
+
+        # Treat this model as a denoising auto encoder
+        # Force the fit, evaluate and upscale methods to take special care about image shape
+        self.type_requires_divisible_shape = True
+        self.uses_learning_phase = False
+
+        self.n = 32
+        self.mode = 2
+
+        self.weight_path = "weights/DistilledResNetSR %dX.h5" % (self.scale_factor)
+        self.type_true_upscaling = True
+
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
+        init =  super(DistilledResNetSR, self).create_model(height, width, channels, load_weights, batch_size)
+
+        x0 = Convolution2D(self.n, (3, 3), activation='relu', padding='same', name='student_sr_res_conv1')(init)
+
+        x = self._residual_block(x0, 1)
+
+        x = Add(name='student_residual')([x, x0])
+        x = self._upscale_block(x, 1)
+
+        x = Convolution2D(3, (3, 3), activation="linear", padding='same', name='student_sr_res_conv_final')(x)
+
+        model = Model(init, x)
+        # dont compile yet
+        if load_weights: model.load_weights(self.weight_path, by_name=True)
+
+        self.model = model
+        return model
+
+    def _residual_block(self, ip, id):
+        mode = False if self.mode == 2 else None
+        channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
+        init = ip
+
+        x = Convolution2D(self.n, (3, 3), activation='linear', padding='same',
+                          name='student_sr_res_conv_' + str(id) + '_1')(ip)
+        x = BatchNormalization(axis=channel_axis, name="student_sr_res_batchnorm_" + str(id) + "_1")(x, training=mode)
+        x = Activation('relu', name="student_sr_res_activation_" + str(id) + "_1")(x)
+
+        x = Convolution2D(self.n, (3, 3), activation='linear', padding='same',
+                          name='student_sr_res_conv_' + str(id) + '_2')(x)
+        x = BatchNormalization(axis=channel_axis, name="student_sr_res_batchnorm_" + str(id) + "_2")(x, training=mode)
+
+        m = Add(name="student_sr_res_merge_" + str(id))([x, init])
+
+        return m
+
+    def _upscale_block(self, ip, id):
+        init = ip
+
+        channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
+        channels = init._keras_shape[channel_dim]
+
+        x = UpSampling2D(name='student_upsampling_%d' % id)(init)
+        x = Convolution2D(self.n * 2, (3, 3), activation="relu", padding='same', name='student_sr_res_filter1_%d' % id)(x)
+
+        return x
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="Distilled ResNetSR History.txt"):
+        super(DistilledResNetSR, self).fit(batch_size, nb_epochs, save_history, history_fn)
