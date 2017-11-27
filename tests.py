@@ -32,6 +32,12 @@ if __name__ == "__main__":
     # model = models.GANImageSuperResolutionModel(scale).create_model(mode='train')
     # plot_model(model, to_file='architectures/GAN Image SR.png', show_shapes=True, show_layer_names=True)
 
+    # model = models.DistilledResNetSR(scale).create_model()
+    # plot_model(model, to_file='architectures/distilled_resnet_sr.png', show_layer_names=True, show_shapes=True)
+
+    model = models.NonLocalResNetSR(scale).create_model()
+    plot_model(model, to_file='architectures/non_local_resnet_sr.png', show_layer_names=True, show_shapes=True)
+
     """
     Train Super Resolution
     """
@@ -89,6 +95,14 @@ if __name__ == "__main__":
     # gsr.fit(nb_pretrain_samples=10000, nb_epochs=10)
 
     """
+    Train Non Local ResNets
+    """
+
+    # non_local_rnsr = models.NonLocalResNetSR(scale)
+    # non_local_rnsr.create_model()
+    # non_local_rnsr.fit(nb_epochs=50)
+
+    """
     Evaluate Super Resolution on Set5/14
     """
 
@@ -130,9 +144,9 @@ if __name__ == "__main__":
     Distilled ResNetSR
     """
 
-    distilled_rnsr = models.DistilledResNetSR(scale)
-    distilled_rnsr.create_model(None, None, 3, load_weights=True)
-    distilled_rnsr.evaluate(val_path)
+    # distilled_rnsr = models.DistilledResNetSR(scale)
+    # distilled_rnsr.create_model(None, None, 3, load_weights=True)
+    # distilled_rnsr.evaluate(val_path)
 
     """
     Evaluate ESPCNN SR on Set 5/14
@@ -147,6 +161,13 @@ if __name__ == "__main__":
 
     # gsr = models.GANImageSuperResolutionModel(scale)
     # gsr.evaluate(val_path)
+
+    """
+    Evaluate Non Local ResNetSR on Set 5/14
+    """
+
+    # non_local_rnsr = models.NonLocalResNetSR(scale)
+    # non_local_rnsr.evaluate(val_path)
 
     """
     Compare output images of sr, esr, dsr and ddsr models

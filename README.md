@@ -1,4 +1,4 @@
-# Image Super Resolution using in Keras 2+ (Theano Backend only)
+# Image Super Resolution using in Keras 2+
 
 Implementation of Image Super Resolution CNN in Keras from the paper 
 <i><a href="https://arxiv.org/pdf/1501.00092v3.pdf">Image Super-Resolution Using Deep Convolutional Networks</a></i>.
@@ -6,13 +6,7 @@ Implementation of Image Super Resolution CNN in Keras from the paper
 Also contains models that outperforms the above mentioned model, termed Expanded Super Resolution, Denoiseing Auto Encoder SRCNN which outperforms both of the above models and Deep Denoise SR, which with certain limitations, outperforms all of the above.
 
 ## Setup
-Since it uses deconvolutions, which are available only in the master branch of Keras and Theano at the moment, the requirements are as follows:
-
-```
-pip install git+https://github.com/fchollet/keras.git --upgrade
-
-pip install git+https://github.com/Theano/Theano.git --upgrade --no-deps
-```
+Supports Keras with Theano and Tensorflow backend. Due to recent report that Theano will no longer be updated, Tensorflow is the default backend for this project now.
 
 ## Usage
 
@@ -35,9 +29,12 @@ The windows_helper script contains a C# program for Windows to easily use the Su
 
 ## Parameters
 ```
---model : Can be one of "sr" (Image Super Resolution), "esr" (Expanded SR), "dsr" (Denoiseing Auto Encoder SR), "ddsr" (Deep Denoise SR)
+--model : Can be one of "sr" (Image Super Resolution), "esr" (Expanded SR), "dsr" (Denoiseing Auto Encoder SR), "ddsr" (Deep Denoise SR), "rnsr" (ResNet SR) or "distilled_rnsr" (Distilled ResNet SR)
 --scale : Scaling factor can be any integer number. Default is 2x scaling.
 --save_intermediate= : Save the intermediate results before applying the Super Resolution algorithm.
+--mode : "fast" or "patch". Patch mode can be useful for memory constrained GPU upscaling, whereas fast mode submits whole image for upscaling in one pass.
+--suffix : Suffix of the scaled image filename
+--patch_size : Used only when patch mode is used. Sets the size of each patch
 ```
 
 ## Model Architecture
@@ -77,6 +74,46 @@ The above is the "Deep Denoiseing SRCNN", which is a modified form of the archit
 Similar to the paper <a href="http://arxiv.org/abs/1606.08921">Image Restoration Using Convolutional Auto-encoders with Symmetric Skip Connections</a>, this can be considered a highly simplified and shallow model compared to the 30 layer architecture used in the above paper. 
 
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/DDSRCNN%20validation%20plot.png" width=100% height=100%>
+
+### ResNet Super Resolution (ResNet SR)
+
+The above is the "ResNet SR" model, derived from the "SRResNet" model of the paper [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/abs/1609.04802)
+
+Currently uses only 6 residual blocks and 2x upscaling rather than the 15 residual blocks and the 4x upscaling from the paper.
+
+### Efficient SubPixel Convolutional Neural Network (ESPCNN)
+
+The above model is the Efficient Subpixel Convolution Neural Network which uses the Subpixel Convolution layers to upscale rather than UpSampling or Deconvolution.
+Currently has not been trained properly.
+
+### GAN Image Super Resolution (GANSR)
+
+The above model is the GAN trained Image Super Resolution network based on the ResNet SR and the SRGAN from the paper above.
+
+**Note** : Does not work properly right now.
+
+### Distilled ResNet Super Resolution (Distilled ResNetSR)
+
+The above model is a smaller ResNet SR that was trained using model distilation techniques from the "teacher" model - the original larger ResNet SR (with 6 residual blocks).
+
+The model was trained via the `distill_network.py` script which can be used to perform distilation training from any teacher network onto a smaller 'student' network.
+
+### Non-Local ResNet Super Resolution (Non-Local ResNetSR)
+
+The above model is a trial to see if Non-Local blocks can obtain better super resolution.
+
+Various issues :
+
+1) They break the fully convolutional behaviour of the network. Due to the flatten and reshape parts of this module, you need to have a set size for the image when building it.
+
+Therefore you cannot construct one model and then pass random size input images to evaluate.
+
+2) The non local blocks require vast amount of memory as their intermediate products. I think this is the reason they suggested to use this at the end of the network where the spatial dimension is just 14x14 or 7x7.
+
+I had consistent ooms when trying it on multiple positions of a super resolution network, and could only successfully place it at the last ResNet block without oom (on just 4 GB 980M).
+
+Finally, I was able to train a model anyway and it got pretty high psnr scores. I wasn't able to evaluate that, and was able to distill the model into ordinary ResNet. It got exactly same psnr score as the original non local model.
+Evaluating that, all the images were a little smoothed out. This is worse than a distilled ResNet which obtains a lower psnr score but sharper images.
 
 ## Training
 If you wish to train the network on your own data set, follow these steps (Performance may vary) :

@@ -10,7 +10,7 @@ scale_factor = 2
 batchsize = 128
 nb_epochs = 50
 
-teacher_model = models.ResNetSR(scale_factor)
+teacher_model = models.DistilledResNetSR(scale_factor)
 teacher_model.create_model(load_weights=True)
 teacher_model.model.summary()
 
@@ -65,7 +65,7 @@ joint_model.compile(optimizer='adam', loss=zero_loss)
 samples_per_epoch = img_utils.image_count()
 val_count = img_utils.val_image_count()
 
-weight_path = 'weights/joint_model %dX.h5' % (scale_factor)
+weight_path = 'weights/joint_model (%s) %dX.h5' % (teacher_model.model_name, scale_factor)
 history_fn = 'Joint_model_training.txt'
 
 train_path = img_utils.output_path
@@ -75,7 +75,7 @@ path_Y = img_utils.output_path + "y/"
 
 callback_list = [ModelCheckpoint(weight_path, monitor='val_loss', save_best_only=True,
                                  mode='min', save_weights_only=True, verbose=2),
-                 TensorBoardBatch('./distillation_logs/'),
+                 TensorBoardBatch('./distillation_logs_%s/' % teacher_model.model_name),
                  HistoryCheckpoint(history_fn),
                  ]
 
