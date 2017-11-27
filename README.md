@@ -76,30 +76,29 @@ Similar to the paper <a href="http://arxiv.org/abs/1606.08921">Image Restoration
 <img src="https://raw.githubusercontent.com/titu1994/ImageSuperResolution/master/architectures/DDSRCNN%20validation%20plot.png" width=100% height=100%>
 
 ### ResNet Super Resolution (ResNet SR)
-
+<img src="https://github.com/titu1994/Image-Super-Resolution/blob/master/architectures/ResNet.png?raw=true" height=2% width=40%>
 The above is the "ResNet SR" model, derived from the "SRResNet" model of the paper [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/abs/1609.04802)
 
 Currently uses only 6 residual blocks and 2x upscaling rather than the 15 residual blocks and the 4x upscaling from the paper.
 
 ### Efficient SubPixel Convolutional Neural Network (ESPCNN)
-
 The above model is the Efficient Subpixel Convolution Neural Network which uses the Subpixel Convolution layers to upscale rather than UpSampling or Deconvolution.
 Currently has not been trained properly.
 
 ### GAN Image Super Resolution (GANSR)
-
+<img src="https://github.com/titu1994/Image-Super-Resolution/blob/master/architectures/GAN%20Image%20SR.png?raw=true" height=100% width=40%>
 The above model is the GAN trained Image Super Resolution network based on the ResNet SR and the SRGAN from the paper above.
 
 **Note** : Does not work properly right now.
 
 ### Distilled ResNet Super Resolution (Distilled ResNetSR)
-
+<img src="https://github.com/titu1994/Image-Super-Resolution/blob/master/architectures/distilled_resnet_sr.png?raw=true" height=100% width=40%>
 The above model is a smaller ResNet SR that was trained using model distilation techniques from the "teacher" model - the original larger ResNet SR (with 6 residual blocks).
 
 The model was trained via the `distill_network.py` script which can be used to perform distilation training from any teacher network onto a smaller 'student' network.
 
 ### Non-Local ResNet Super Resolution (Non-Local ResNetSR)
-
+<img src="https://github.com/titu1994/Image-Super-Resolution/blob/master/architectures/non_local_resnet_sr.png?raw=true" height=40% width=40%>
 The above model is a trial to see if Non-Local blocks can obtain better super resolution.
 
 Various issues :
