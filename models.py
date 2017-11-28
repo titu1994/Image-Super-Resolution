@@ -14,7 +14,12 @@ import img_utils
 import numpy as np
 import os
 import time
-import cv2
+
+try:
+    import cv2
+    _cv2_available = True
+except:
+    _cv2_available = False
 
 train_path = img_utils.output_path
 validation_path = img_utils.validation_output_path
@@ -146,11 +151,11 @@ class BaseSuperResolutionModel(object):
         # Read image
         scale_factor = int(self.scale_factor)
         true_img = imread(img_path, mode='RGB')
-        init_width, init_height = true_img.shape[0], true_img.shape[1]
+        init_dim_1, init_dim_2 = true_img.shape[0], true_img.shape[1]
         if verbose: print("Old Size : ", true_img.shape)
-        if verbose: print("New Size : (%d, %d, 3)" % (init_height * scale_factor, init_width * scale_factor))
+        if verbose: print("New Size : (%d, %d, 3)" % (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
 
-        img_height, img_width = 0, 0
+        img_dim_1, img_dim_2 = 0, 0
 
         if mode == "patch" and self.type_true_upscaling:
             # Overriding mode for True Upscaling models
@@ -167,14 +172,14 @@ class BaseSuperResolutionModel(object):
             images = img_utils.make_patches(true_img, scale_factor, patch_size, verbose)
 
             nb_images = images.shape[0]
-            img_width, img_height = images.shape[1], images.shape[2]
-            print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_images, img_height, img_width))
+            img_dim_1, img_dim_2 = images.shape[1], images.shape[2]
+            print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_images, img_dim_2, img_dim_1))
         else:
             # Use full image for super resolution
-            img_width, img_height = self.__match_autoencoder_size(img_height, img_width, init_height,
-                                                                  init_width, scale_factor)
+            img_dim_1, img_dim_2 = self.__match_autoencoder_size(img_dim_1, img_dim_2, init_dim_1, init_dim_2,
+                                                                 scale_factor)
 
-            images = imresize(true_img, (img_width, img_height))
+            images = imresize(true_img, (img_dim_1, img_dim_2))
             images = np.expand_dims(images, axis=0)
             print("Image is reshaped to : (%d, %d, %d)" % (images.shape[1], images.shape[2], images.shape[3]))
 
@@ -183,7 +188,7 @@ class BaseSuperResolutionModel(object):
         if save_intermediate:
             if verbose: print("Saving intermediate image.")
             fn = path[0] + "_intermediate_" + path[1]
-            intermediate_img = imresize(true_img, (init_width * scale_factor, init_height * scale_factor))
+            intermediate_img = imresize(true_img, (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
             imsave(fn, intermediate_img)
 
         # Transpose and Process images
@@ -192,7 +197,7 @@ class BaseSuperResolutionModel(object):
         else:
             img_conv = images.astype(np.float32) / 255.
 
-        model = self.create_model(img_height, img_width, load_weights=True)
+        model = self.create_model(img_dim_2, img_dim_1, load_weights=True)
         if verbose: print("Model loaded.")
 
         # Create prediction for image patches
@@ -208,16 +213,18 @@ class BaseSuperResolutionModel(object):
 
         # Output shape is (original_width * scale, original_height * scale, nb_channels)
         if mode == 'patch':
-            out_shape = (init_width * scale_factor, init_height * scale_factor, 3)
+            out_shape = (init_dim_1 * scale_factor, init_dim_2 * scale_factor, 3)
             result = img_utils.combine_patches(result, out_shape, scale_factor)
         else:
             result = result[0, :, :, :] # Access the 3 Dimensional image vector
 
         result = np.clip(result, 0, 255).astype('uint8')
 
-        result = cv2.pyrUp(result)
-        result = cv2.medianBlur(result, 3)
-        result = cv2.pyrDown(result)
+        if _cv2_available:
+            # used to remove noisy edges
+            result = cv2.pyrUp(result)
+            result = cv2.medianBlur(result, 3)
+            result = cv2.pyrDown(result)
 
         if verbose: print("\nCompleted De-processing image.")
 
@@ -228,41 +235,41 @@ class BaseSuperResolutionModel(object):
         if verbose: print("Saving image.")
         imsave(filename, result)
 
-    def __match_autoencoder_size(self, img_height, img_width, init_height, init_width, scale_factor):
+    def __match_autoencoder_size(self, img_dim_1, img_dim_2, init_dim_1, init_dim_2, scale_factor):
         if self.type_requires_divisible_shape:
             if not self.type_true_upscaling:
                 # AE model but not true upsampling
-                if ((init_height * scale_factor) % 4 != 0) or ((init_width * scale_factor) % 4 != 0) or \
-                        (init_height % 2 != 0) or (init_width % 2 != 0):
+                if ((init_dim_2 * scale_factor) % 4 != 0) or ((init_dim_1 * scale_factor) % 4 != 0) or \
+                        (init_dim_2 % 2 != 0) or (init_dim_1 % 2 != 0):
 
                     print("AE models requires image size which is multiple of 4.")
-                    img_height = ((init_height * scale_factor) // 4) * 4
-                    img_width = ((init_width * scale_factor) // 4) * 4
+                    img_dim_2 = ((init_dim_2 * scale_factor) // 4) * 4
+                    img_dim_1 = ((init_dim_1 * scale_factor) // 4) * 4
 
                 else:
                     # No change required
-                    img_height, img_width = init_height * scale_factor, init_width * scale_factor
+                    img_dim_2, img_dim_1 = init_dim_2 * scale_factor, init_dim_1 * scale_factor
             else:
                 # AE model and true upsampling
-                if ((init_height) % 4 != 0) or ((init_width) % 4 != 0) or \
-                        (init_height % 2 != 0) or (init_width % 2 != 0):
+                if ((init_dim_2) % 4 != 0) or ((init_dim_1) % 4 != 0) or \
+                        (init_dim_2 % 2 != 0) or (init_dim_1 % 2 != 0):
 
                     print("AE models requires image size which is multiple of 4.")
-                    img_height = ((init_height) // 4) * 4
-                    img_width = ((init_width) // 4) * 4
+                    img_dim_2 = ((init_dim_2) // 4) * 4
+                    img_dim_1 = ((init_dim_1) // 4) * 4
 
                 else:
                     # No change required
-                    img_height, img_width = init_height, init_width
+                    img_dim_2, img_dim_1 = init_dim_2, init_dim_1
         else:
             # Not AE but true upsampling
             if self.type_true_upscaling:
-                img_height, img_width = init_height, init_width
+                img_dim_2, img_dim_1 = init_dim_2, init_dim_1
             else:
                 # Not AE and not true upsampling
-                img_height, img_width = init_height * scale_factor, init_width * scale_factor
+                img_dim_2, img_dim_1 = init_dim_2 * scale_factor, init_dim_1 * scale_factor
 
-        return img_height, img_width
+        return img_dim_1, img_dim_2,
 
 
 def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=False):
