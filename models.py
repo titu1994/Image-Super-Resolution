@@ -14,11 +14,13 @@ import img_utils
 import numpy as np
 import os
 import time
+import warnings
 
 try:
     import cv2
     _cv2_available = True
 except:
+    warnings.warn('Could not load opencv properly. This may affect the quality of output images.')
     _cv2_available = False
 
 train_path = img_utils.output_path

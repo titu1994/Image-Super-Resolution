@@ -35,8 +35,8 @@ if __name__ == "__main__":
     # model = models.DistilledResNetSR(scale).create_model()
     # plot_model(model, to_file='architectures/distilled_resnet_sr.png', show_layer_names=True, show_shapes=True)
 
-    model = models.NonLocalResNetSR(scale).create_model()
-    plot_model(model, to_file='architectures/non_local_resnet_sr.png', show_layer_names=True, show_shapes=True)
+    # model = models.NonLocalResNetSR(scale).create_model()
+    # plot_model(model, to_file='architectures/non_local_resnet_sr.png', show_layer_names=True, show_shapes=True)
 
     """
     Train Super Resolution
