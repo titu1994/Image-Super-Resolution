@@ -4,7 +4,6 @@ import numpy as np
 from scipy.misc import imsave, imread, imresize
 from sklearn.feature_extraction.image import reconstruct_from_patches_2d, extract_patches_2d
 from scipy.ndimage.filters import gaussian_filter
-import cv
 
 from keras import backend as K
 
