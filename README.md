@@ -7,6 +7,7 @@ Also contains models that outperforms the above mentioned model, termed Expanded
 
 ## Setup
 Supports Keras with Theano and Tensorflow backend. Due to recent report that Theano will no longer be updated, Tensorflow is the default backend for this project now.
+Requires Pillow, imageio, sklearn, scipy
 
 ## Usage
 
