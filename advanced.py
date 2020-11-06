@@ -6,7 +6,7 @@ from keras.layers import MaxPool1D
 
 from keras.callbacks import Callback, TensorBoard
 from keras.engine.topology import Layer
-from keras import backend as K
+from tensorflow.keras import backend as K
 
 ''' Callbacks '''
 class HistoryCheckpoint(Callback):
@@ -111,7 +111,7 @@ class TensorBoardBatch(TensorBoard):
 
 ''' Theano Backend function '''
 
-def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_dim_ordering(), name=None):
+def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_data_format(), name=None):
     ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
 
     import theano.tensor as T
@@ -214,7 +214,7 @@ class SubPixelUpscaling(Layer):
         return y
 
     def get_output_shape_for(self, input_shape):
-        if K.image_dim_ordering() == "th":
+        if K.image_data_format() == "th":
             b, k, r, c = input_shape
             return (b, self.channels, r * self.r, c * self.r)
         else:
