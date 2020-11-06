@@ -1,7 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
-import numpy as np
-from scipy.misc import imsave, imread, imresize
+import numpy as np 
+from imageio import imwrite, imread
 from sklearn.feature_extraction.image import reconstruct_from_patches_2d, extract_patches_2d
 from scipy.ndimage.filters import gaussian_filter
 
@@ -93,7 +93,7 @@ if not os.path.exists(output_path):
 #         for i in range(nb_hr_images):
 #             ip = hr_samples[i]
 #             # Save ground truth image X
-#             imsave(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
+#             imwrite(output_directory + "/y/" + "%d_%d.png" % (index, i + 1), ip)
 #
 #             # Apply Gaussian Blur to Y
 #             op = gaussian_filter(ip, sigma=0.5)
@@ -106,7 +106,7 @@ if not os.path.exists(output_path):
 #                 op = imresize(op, (hr_patch_size, hr_patch_size), interp='bicubic')
 #
 #             # Save Y
-#             imsave(output_directory + "/X/" + "%d_%d.png" % (index, i+1), op)
+#             imwrite(output_directory + "/X/" + "%d_%d.png" % (index, i+1), op)
 #
 #         print("Finished image %d in time %0.2f seconds. (%s)" % (index, time.time() - t1, file))
 #         index += 1
@@ -148,7 +148,8 @@ def transform_images_temp(directory, output_directory, scaling_factor=2, max_nb_
         img = imread(directory + file, mode='RGB')
 
         # Resize to 256 x 256
-        img = imresize(img, (img_size, img_size))
+        #img = imresize(img, (img_size, img_size))
+        img = img.resize((img_size, img_size))
 
         # Create patches
         hr_patch_size = 64
@@ -173,20 +174,20 @@ def transform_images_temp(directory, output_directory, scaling_factor=2, max_nb_
         for i in range(nb_hr_images):
             ip = hr_samples[i]
             # Save ground truth image X
-            imsave(output_directory + "/y/" + "%d_%d.png" % (index + id_advance, i + 1), ip)
+            imwrite(output_directory + "/y/" + "%d_%d.png" % (index + id_advance, i + 1), ip)
 
             # Apply Gaussian Blur to Y
             #op = gaussian_filter(ip, sigma=0.5)
 
             # Subsample by scaling factor to Y
-            op = imresize(ip, (lr_patch_size, lr_patch_size), interp='bicubic')
+            op = ip.BICUBIC((lr_path_size, lr_path_size))
 
             if not true_upscale:
                 # Upscale by scaling factor to Y
-                op = imresize(op, (hr_patch_size, hr_patch_size), interp='bicubic')
+                op = op.BICUBIC((hr_patch_size, hr_patch_size))
 
             # Save Y
-            imsave(output_directory + "/X/" + "%d_%d.png" % (index + id_advance, id_advance + i + 1), op)
+            imwrite(output_directory + "/X/" + "%d_%d.png" % (index + id_advance, id_advance + i + 1), op)
 
         print("Finished image %d in time %0.2f seconds. (%s)" % (index + id_advance, time.time() - t1, file))
         index += 1
@@ -218,7 +219,8 @@ def subimage_generator(img, stride, patch_size, nb_hr_images):
 def make_patches(x, scale, patch_size, upscale=True, verbose=1):
     '''x shape: (num_channels, rows, cols)'''
     height, width = x.shape[:2]
-    if upscale: x = imresize(x, (height * scale, width * scale))
+    (p_height, p_width) = (height * scale, width * scale)                            
+    if upscale: x = x.resize((p_height, p_width))
     patches = extract_patches_2d(x, (patch_size, patch_size))
     return patches
 
@@ -232,7 +234,7 @@ def image_generator(directory, scale_factor=2, target_shape=None, channels=3, sm
                     batch_size=32, nb_inputs=1, seed=None):
     if not target_shape:
         if small_train_images:
-            if K.image_dim_ordering() == "th":
+            if K.image_data_format() == "th":
                 image_shape = (channels, 16 * _image_scale_multiplier, 16 * _image_scale_multiplier)
                 y_image_shape = (channels, 16 * scale_factor * _image_scale_multiplier,
                                  16 * scale_factor * _image_scale_multiplier)
@@ -244,7 +246,7 @@ def image_generator(directory, scale_factor=2, target_shape=None, channels=3, sm
                 y_image_shape = (32 * scale_factor * _image_scale_multiplier,
                                  32 * scale_factor * _image_scale_multiplier, channels)
         else:
-            if K.image_dim_ordering() == "th":
+            if K.image_data_format() == "th":
                 image_shape = (channels, 32 * scale_factor * _image_scale_multiplier, 32 * scale_factor * _image_scale_multiplier)
                 y_image_shape = image_shape
             else:
@@ -253,7 +255,7 @@ def image_generator(directory, scale_factor=2, target_shape=None, channels=3, sm
                 y_image_shape = image_shape
     else:
         if small_train_images:
-            if K.image_dim_ordering() == "th":
+            if K.image_data_format() == "th":
                 y_image_shape = (3,) + target_shape
 
                 target_shape = (target_shape[0] * _image_scale_multiplier // scale_factor,
@@ -266,7 +268,7 @@ def image_generator(directory, scale_factor=2, target_shape=None, channels=3, sm
                                 target_shape[1] * _image_scale_multiplier // scale_factor)
                 image_shape = target_shape + (channels,)
         else:
-            if K.image_dim_ordering() == "th":
+            if K.image_data_format() == "th":
                 image_shape = (channels,) + target_shape
                 y_image_shape = image_shape
             else:
@@ -290,21 +292,22 @@ def image_generator(directory, scale_factor=2, target_shape=None, channels=3, sm
 
         for i, j in enumerate(index_array):
             x_fn = X_filenames[j]
-            img = imread(x_fn, mode='RGB')
+            img = imread(x_fn)
             if small_train_images:
-                img = imresize(img, (32 * _image_scale_multiplier, 32 * _image_scale_multiplier))
+                (img_width, img_height) = (32 * _image_scale_multiplier, 32 * _image_scale_multiplier)
+                img = img.resize((img_width, img_height))
             img = img.astype('float32') / 255.
 
-            if K.image_dim_ordering() == "th":
+            if K.image_data_format() == "th":
                 batch_x[i] = img.transpose((2, 0, 1))
             else:
                 batch_x[i] = img
 
             y_fn = y_filenames[j]
-            img = imread(y_fn, mode="RGB")
+            img = imread(y_fn)
             img = img.astype('float32') / 255.
 
-            if K.image_dim_ordering() == "th":
+            if K.image_data_format() == "th":
                 batch_y[i] = img.transpose((2, 0, 1))
             else:
                 batch_y[i] = img
