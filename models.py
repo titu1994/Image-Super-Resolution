@@ -31,10 +31,8 @@ path_Y = img_utils.output_path + "y/"
 def PSNRLoss(y_true, y_pred):
     """
     PSNR is Peek Signal to Noise Ratio, which is similar to mean squared error.
-
     It can be calculated as
     PSNR = 20 * log10(MAXp) - 10 * log10(MSE)
-
     When providing an unscaled input, MAXp = 255. Therefore 20 * log10(255)== 48.1308036087.
     However, since we are scaling our input, MAXp = 1. Therefore 20 * log10(1) = 0.
     Thus we remove that component completely and only compute the remaining MSE component.
@@ -134,7 +132,6 @@ class BaseSuperResolutionModel(object):
                 patch_size=8, mode="patch", verbose=True):
         """
         Standard method to upscale an image.
-
         :param img_path:  path to the image
         :param save_intermediate: saves the intermediate upscaled image (bilinear upscale)
         :param return_image: returns a image of shape (height, width, channels).
