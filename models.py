@@ -5,7 +5,6 @@ from keras.layers import Concatenate, Add, Average, Input, Dense, Flatten, Batch
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D, Convolution2DTranspose
 from keras import backend as K
 from keras.utils.np_utils import to_categorical
-from PIL import Image
 import keras.callbacks as callbacks
 import keras.optimizers as optimizers
 
@@ -16,8 +15,6 @@ import numpy as np
 import os
 import time
 import warnings
-
-K.common.set_image_dim_ordering('th')
 
 try:
     import cv2
@@ -34,10 +31,8 @@ path_Y = img_utils.output_path + "y/"
 def PSNRLoss(y_true, y_pred):
     """
     PSNR is Peek Signal to Noise Ratio, which is similar to mean squared error.
-
     It can be calculated as
     PSNR = 20 * log10(MAXp) - 10 * log10(MSE)
-
     When providing an unscaled input, MAXp = 255. Therefore 20 * log10(255)== 48.1308036087.
     However, since we are scaling our input, MAXp = 1. Therefore 20 * log10(1) = 0.
     Thus we remove that component completely and only compute the remaining MSE component.
@@ -70,7 +65,7 @@ class BaseSuperResolutionModel(object):
         self.evaluation_func = None
         self.uses_learning_phase = False
 
-    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128):
+    def create_model(self, height=32, width=32, channels=3, load_weights=False, batch_size=128) -> Model:
         """
         Subclass dependent implementation.
         """
@@ -78,7 +73,7 @@ class BaseSuperResolutionModel(object):
             assert height * img_utils._image_scale_multiplier % 4 == 0, "Height of the image must be divisible by 4"
             assert width * img_utils._image_scale_multiplier % 4 == 0, "Width of the image must be divisible by 4"
 
-        if K.image_data_format() == "th":
+        if K.image_dim_ordering() == "th":
             if width is not None and height is not None:
                 shape = (channels, width * img_utils._image_scale_multiplier, height * img_utils._image_scale_multiplier)
             else:
@@ -93,7 +88,7 @@ class BaseSuperResolutionModel(object):
 
         return init
 
-    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="Model History.txt"):
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="Model History.txt") -> Model:
         """
         Standard method to train any of the models.
         """
@@ -137,7 +132,6 @@ class BaseSuperResolutionModel(object):
                 patch_size=8, mode="patch", verbose=True):
         """
         Standard method to upscale an image.
-
         :param img_path:  path to the image
         :param save_intermediate: saves the intermediate upscaled image (bilinear upscale)
         :param return_image: returns a image of shape (height, width, channels).
@@ -147,7 +141,7 @@ class BaseSuperResolutionModel(object):
         :param mode: mode of upscaling. Can be "patch" or "fast"
         """
         import os
-        from imageio import imwrite, imread
+        from scipy.misc import imread, imresize, imsave
 
         # Destination path
         path = os.path.splitext(img_path)
@@ -155,7 +149,7 @@ class BaseSuperResolutionModel(object):
 
         # Read image
         scale_factor = int(self.scale_factor)
-        true_img = imread(img_path)
+        true_img = imread(img_path, mode='RGB')
         init_dim_1, init_dim_2 = true_img.shape[0], true_img.shape[1]
         if verbose: print("Old Size : ", true_img.shape)
         if verbose: print("New Size : (%d, %d, 3)" % (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
@@ -184,23 +178,20 @@ class BaseSuperResolutionModel(object):
             img_dim_1, img_dim_2 = self.__match_autoencoder_size(img_dim_1, img_dim_2, init_dim_1, init_dim_2,
                                                                  scale_factor)
 
-            #images = imresize(true_img, (img_dim_1, img_dim_2))
-            images = true_img.resize((img_dim_1, img_dim_2))
+            images = imresize(true_img, (img_dim_1, img_dim_2))
             images = np.expand_dims(images, axis=0)
-            #print("Image is reshaped to : (%d, %d, %d)" % (images.shape[1], images.shape[2], images.shape[3]))
+            print("Image is reshaped to : (%d, %d, %d)" % (images.shape[1], images.shape[2], images.shape[3]))
 
         # Save intermediate bilinear scaled image is needed for comparison.
         intermediate_img = None
         if save_intermediate:
             if verbose: print("Saving intermediate image.")
             fn = path[0] + "_intermediate_" + path[1]
-            #intermediate_img = imresize(true_img, (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
-            (inter_width, inter_height) = (init_dim_1 * scale_factor, init_dim_2 * scale_factor)
-            intermediate_img = true_img.resize((inter_width, inter_height))
+            intermediate_img = imresize(true_img, (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
             imsave(fn, intermediate_img)
 
         # Transpose and Process images
-        if K.image_data_format() == "th":
+        if K.image_dim_ordering() == "th":
             img_conv = images.transpose((0, 3, 1, 2)).astype(np.float32) / 255.
         else:
             img_conv = images.astype(np.float32) / 255.
@@ -214,7 +205,7 @@ class BaseSuperResolutionModel(object):
         if verbose: print("De-processing images.")
 
          # Deprocess patches
-        if K.image_data_format() == "th":
+        if K.image_dim_ordering() == "th":
             result = result.transpose((0, 2, 3, 1)).astype(np.float32) * 255.
         else:
             result = result.astype(np.float32) * 255.
@@ -280,7 +271,7 @@ class BaseSuperResolutionModel(object):
         return img_dim_1, img_dim_2,
 
 
-def _evaluate(sr_model, BaseSuperResolutionModel, validation_dir, scale_pred=False):
+def _evaluate(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=False):
     """
     Evaluates the model on the Validation images
     """
@@ -310,7 +301,7 @@ def _evaluate(sr_model, BaseSuperResolutionModel, validation_dir, scale_pred=Fal
             t1 = time.time()
 
             # Input image
-            y = img_utils.imread(val_dir + impath)
+            y = img_utils.imread(val_dir + impath, mode='RGB')
             width, height, _ = y.shape
 
             if sr_model.type_requires_divisible_shape:
@@ -324,8 +315,7 @@ def _evaluate(sr_model, BaseSuperResolutionModel, validation_dir, scale_pred=Fal
                     print("Model %s require the image size to be divisible by 4. New image size = (%d, %d)" % \
                           (sr_model.model_name, width, height))
 
-                    #y = img_utils.imresize(y, (width, height), interp='bicubic')
-                    y = y.BICUBIC((width, height))
+                    y = img_utils.imresize(y, (width, height), interp='bicubic')
 
             y = y.astype('float32')
             x_width = width if not sr_model.type_true_upscaling else width // sr_model.scale_factor
@@ -342,17 +332,16 @@ def _evaluate(sr_model, BaseSuperResolutionModel, validation_dir, scale_pred=Fal
 
             y = np.expand_dims(y, axis=0)
 
-            #img = img_utils.imresize(x_temp, (x_width, x_height),
-             #                        interp='bicubic')
-            img = x_temp.BICUBIC((x_width, x_height))
-                                     
+            img = img_utils.imresize(x_temp, (x_width, x_height),
+                                     interp='bicubic')
+
             if not sr_model.type_true_upscaling:
-                img = img.BICUBIC((x_width, x_height))
+                img = img_utils.imresize(img, (x_width, x_height), interp='bicubic')
 
 
             x = np.expand_dims(img, axis=0)
 
-            if K.image_data_format() == "th":
+            if K.image_dim_ordering() == "th":
                 x = x.transpose((0, 3, 1, 2))
                 y = y.transpose((0, 3, 1, 2))
 
@@ -378,7 +367,7 @@ def _evaluate(sr_model, BaseSuperResolutionModel, validation_dir, scale_pred=Fal
 
             generated_path = predict_path + "%s_%s_generated.png" % (sr_model.model_name, os.path.splitext(impath)[0])
 
-            if K.image_data_format() == "th":
+            if K.image_dim_ordering() == "th":
                 y_pred = y_pred.transpose((1, 2, 0))
 
             y_pred = np.clip(y_pred, 0, 255).astype('uint8')
@@ -387,7 +376,7 @@ def _evaluate(sr_model, BaseSuperResolutionModel, validation_dir, scale_pred=Fal
         print("Average PRNS value of validation images = %00.4f \n" % (total_psnr / nb_images))
 
 
-def _evaluate_denoise(sr_model, BaseSuperResolutionModel, validation_dir, scale_pred=False):
+def _evaluate_denoise(sr_model : BaseSuperResolutionModel, validation_dir, scale_pred=False):
     print("Validating %s model" % sr_model.model_name)
     predict_path = "val_predict/"
     if not os.path.exists(predict_path):
@@ -408,7 +397,7 @@ def _evaluate_denoise(sr_model, BaseSuperResolutionModel, validation_dir, scale_
             t1 = time.time()
 
             # Input image
-            y = img_utils.imread(val_dir + impath)
+            y = img_utils.imread(val_dir + impath, mode='RGB')
             width, height, _ = y.shape
 
             if ((width // sr_model.scale_factor) % 4 != 0) or ((height // sr_model.scale_factor) % 4 != 0) \
@@ -419,7 +408,7 @@ def _evaluate_denoise(sr_model, BaseSuperResolutionModel, validation_dir, scale_
                 print("Model %s require the image size to be divisible by 4. New image size = (%d, %d)" % \
                       (sr_model.model_name, width, height))
 
-                y = y.BICUBIC((width, height))
+                y = img_utils.imresize(y, (width, height), interp='bicubic')
 
             y = y.astype('float32')
             y = np.expand_dims(y, axis=0)
@@ -433,16 +422,15 @@ def _evaluate_denoise(sr_model, BaseSuperResolutionModel, validation_dir, scale_
                 x_temp /= 255.
                 y /= 255.
 
-            (x_width, x_height) = (width // sr_model.scale_factor, height // sr_model.scale_factor)
-            #img = img_utils.imresize(x_temp[0], (width // sr_model.scale_factor, height // sr_model.scale_factor),
-            #                         interp='bicubic', mode='RGB')
-            img = x_temp[0].BICUBIC((x_width, x_height))
+            img = img_utils.imresize(x_temp[0], (width // sr_model.scale_factor, height // sr_model.scale_factor),
+                                     interp='bicubic', mode='RGB')
 
             if not sr_model.type_true_upscaling:
-                img = img.BICUBIC((width, height))
+                img = img_utils.imresize(img, (width, height), interp='bicubic')
+
             x = np.expand_dims(img, axis=0)
 
-            if K.image_data_format() == "th":
+            if K.image_dim_ordering() == "th":
                 x = x.transpose((0, 3, 1, 2))
                 y = y.transpose((0, 3, 1, 2))
 
@@ -478,7 +466,7 @@ def _evaluate_denoise(sr_model, BaseSuperResolutionModel, validation_dir, scale_
 
             generated_path = predict_path + "%s_%s_generated.png" % (sr_model.model_name, os.path.splitext(impath)[0])
 
-            if K.image_data_format() == "th":
+            if K.image_dim_ordering() == "th":
                 y_pred = y_pred.transpose((1, 2, 0))
 
             y_pred = np.clip(y_pred, 0, 255).astype('uint8')
@@ -588,7 +576,7 @@ class DenoisingAutoEncoderSR(BaseSuperResolutionModel):
         # Perform check that model input shape is divisible by 4
         init = super(DenoisingAutoEncoderSR, self).create_model(height, width, channels, load_weights, batch_size)
 
-        if K.image_data_format() == "th":
+        if K.image_dim_ordering() == "th":
             output_shape = (None, channels, width, height)
         else:
             output_shape = (None, width, height, channels)
@@ -842,7 +830,7 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
         """
         assert mode in ['test', 'train'], "'mode' must be either 'train' or 'test'"
 
-        channel_axis = 1 if K.image_data_format() == 'th' else -1
+        channel_axis = 1 if K.image_dim_ordering() == 'th' else -1
 
         gen_init = super(GANImageSuperResolutionModel, self).create_model(height, width, channels, load_weights, batch_size)
 
@@ -950,7 +938,7 @@ class GANImageSuperResolutionModel(BaseSuperResolutionModel):
     def fit(self, nb_pretrain_samples=5000, batch_size=128, nb_epochs=100, disc_train_flip=0.1,
             save_history=True, history_fn="GAN SRCNN History.txt"):
         samples_per_epoch = img_utils.image_count()
-        meanaxis = (0, 2, 3) if K.image_data_format() == 'th' else (0, 1, 2)
+        meanaxis = (0, 2, 3) if K.image_dim_ordering() == 'th' else (0, 1, 2)
 
         if self.model == None: self.create_model(mode='train', batch_size=batch_size)
 
