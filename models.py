@@ -647,7 +647,7 @@ class DeepDenoiseSR(BaseSuperResolutionModel):
 
         m2 = Add()([c1, c1_2])
 
-        decoded = Convolution2D(channels, 5, 5, activation='linear', border_mode='same')(m2)
+        decoded = Convolution2D(channels, (5, 5), activation='linear', padding='same')(m2)
 
         model = Model(init, decoded)
         adam = optimizers.Adam(lr=1e-3)
