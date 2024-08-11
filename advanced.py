@@ -1,12 +1,13 @@
 import itertools
+import tensorflow
+from tensorflow.keras.layers import Activation, Reshape, Lambda, concatenate, dot, add
+from tensorflow.keras.layers import Conv1D, Conv2D, Conv3D
+from tensorflow.keras.layers import MaxPool1D
 
-from keras.layers import Activation, Reshape, Lambda, concatenate, dot, add
-from keras.layers import Conv1D, Conv2D, Conv3D
-from keras.layers import MaxPool1D
+from tensorflow.keras.callbacks import Callback, TensorBoard
+from tensorflow.keras.layers import Layer
+from tensorflow.keras import backend as K
 
-from keras.callbacks import Callback, TensorBoard
-from keras.engine.topology import Layer
-from keras import backend as K
 
 ''' Callbacks '''
 class HistoryCheckpoint(Callback):
@@ -111,7 +112,7 @@ class TensorBoardBatch(TensorBoard):
 
 ''' Theano Backend function '''
 
-def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_dim_ordering(), name=None):
+def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_data_format(), name=None):
     ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
 
     import theano.tensor as T
